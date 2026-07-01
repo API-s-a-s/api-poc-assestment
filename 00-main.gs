@@ -193,8 +193,8 @@ function AuditoriasAppsExternas() {
     const auditor = new SecurityAuditorFacade(auth, globalContext);
 
     // 1. Instanciamos las estrategias exclusivas de Apps Externas
-    const estrategias = [
-      new GoogleServicesApiControlStrategy(customerId),
+    const estrategias = [      
+      new GoogleServicesApiControlStrategy(customerId),      
       new GoogleCloudApiControlStrategy(customerId),
       new UnconfiguredAppsStrategy(customerId),
       new InternalAppsTrustStrategy(customerId),

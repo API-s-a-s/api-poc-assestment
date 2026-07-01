@@ -121,14 +121,14 @@ class GoogleCloudApiControlStrategy extends ApiStrategy {
     }
 
     let riesgo045, comentario045, valorPrincipalFormateado;
+    valorPrincipalFormateado = `${restrictedCount} restringidos`;
+    const appsBloqueadas = restrictedServicesList.length > 0 ? ` (Apps bloqueadas: ${restrictedServicesList.join(", ")})` : "";
+
     if (!isCloudPlatformSecure || !isCloudBillingSecure) {
       riesgo045 = "Alto";
-      valorPrincipalFormateado = "0 restringidos";
-      comentario045 = "Vulnerabilidad Crítica de Infraestructura (Shadow IT en GCP): Los alcances globales de Google Cloud Platform (GCP) o Facturación no se encuentran explícitamente restringidos contra terceros. Tokens expuestos pueden tomar control de entornos de cómputo.";
+      comentario045 = `La app ${appsBloqueadas}  se restringe contra terceros. `;
     } else {
       riesgo045 = "Bajo";
-      valorPrincipalFormateado = `${restrictedCount} restringidos`;
-      const appsBloqueadas = restrictedServicesList.length > 0 ? ` (Apps bloqueadas: ${restrictedServicesList.join(", ")})` : "";
       comentario045 = `Cumplimiento Zero Trust: ${restrictedCount} servicios de Google Cloud (GCP) están restringidos correctamente frente a aplicaciones de terceros, protegiendo los entornos de desarrollo y facturación.${appsBloqueadas}`;
     }
 

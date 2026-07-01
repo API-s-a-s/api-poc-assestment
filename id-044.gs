@@ -83,6 +83,9 @@ class GoogleServicesApiControlStrategy extends ApiStrategy {
       }
 
       if (rootPolicy && rootPolicy.setting) {
+        // [Temporal] Guardar la política raíz en el contexto global para que ID-045 la reutilice
+        globalContext._tempGoogleServicesRootPolicy = rootPolicy;
+
         const configNode = rootPolicy.setting.value || rootPolicy.setting;
         const services = configNode.services || [];
         
