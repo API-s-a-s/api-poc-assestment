@@ -58,7 +58,7 @@ class ContextAwareAccessStrategy extends ApiStrategy {
       const response = this.fetchWithBackoff(urlReports, options);
       if (response && response.getResponseCode() === 200) {
         const data = JSON.parse(response.getContentText());
-        const items = data.items || []; // CORREGIDO: Sintaxis ||; cambiada a || []
+        const items = data.items || []; 
         
         if (items.length > 0) {
           // CORREGIDO: Dado que items es un arreglo, accedemos de forma segura a su primer elemento
@@ -117,7 +117,7 @@ class ContextAwareAccessStrategy extends ApiStrategy {
       };
     }
 
-    let accessLevels = json.accessLevels || []; // CORREGIDO: Sintaxis ||; cambiada a || []
+    let accessLevels = json.accessLevels || []; 
     if (json.nextPageToken) {
       Logger.log("[INFO] Paginación detectada. Extrayendo niveles restantes...");
       const allLevels = this.fetchPaginated(this.urlLevels, "accessLevels");
@@ -146,21 +146,21 @@ class ContextAwareAccessStrategy extends ApiStrategy {
     let riesgo025, comentario025;
 
     if (totalLevels === 0) {
-      respuestaConcreta = "Deshabilitado (Consola sin niveles de acceso)";
+      respuestaConcreta = "Deshabilitado (Sin niveles de acceso)";
       riesgo025 = "Alto";
       comentario025 = "VULNERABILIDAD CRÍTICA: La consola de administración de Context-Aware Access no cuenta con ningún nivel de acceso definido. El entorno no posee restricciones contextuales y permite la autenticación desde cualquier ubicación o estado de dispositivo.";
     } else if (zeroTrustLevels.length === 0) {
       respuestaConcreta = "Deshabilitado (Capas sin restricciones válidas)";
       riesgo025 = "Alto";
-      comentario025 = `ALERTA DE SEGURIDAD: Se detectaron ${totalLevels} niveles de acceso en la consola, pero ninguno de ellos aplica restricciones de seguridad reales basadas en subredes IP, geocercas o políticas de cumplimiento de dispositivos corporativos.`;
-    } else if (estadoConsola === "DESHABILITADO" && !tieneDispositivosEV) { // CORREGIDO: Espacio entre operadores && !
+      comentario025 = `Se detectaron ${totalLevels} niveles de acceso en la consola, pero ninguno de ellos aplica restricciones de seguridad reales basadas en subredes IP, geocercas o políticas de cumplimiento de dispositivos corporativos.`;
+    } else if (estadoConsola === "DESHABILITADO" && !tieneDispositivosEV) { 
       respuestaConcreta = "Deshabilitado (Capas huérfanas / Consola OFF)";
       riesgo025 = "Alto";
       comentario025 = `RIESGO DETECTADO: Existen ${zeroTrustLevels.length} niveles de acceso con configuraciones restrictivas de Zero Trust válidas. Sin embargo, se ha detectado que Context-Aware Access está apagado globalmente en la consola o no cuenta con aplicaciones enforzadas ni telemetría activa de Endpoint Verification.`;
     } else {
-      respuestaConcreta = `Habilitado (${zeroTrustLevels.length} niveles activos detectados)`;
+      respuestaConcreta = `${zeroTrustLevels.length} niveles activos`;
       riesgo025 = "Bajo";
-      comentario025 = `CUMPLIMIENTO: Context-Aware Access está activo y aplicando controles. Se validan correctamente ${zeroTrustLevels.length} niveles de acceso restrictivos basados en subredes de red, geolocalización o cumplimiento de postura de seguridad del dispositivo.`;
+      comentario025 = `Context-Aware Access está activo y aplicando controles. Se validan correctamente ${zeroTrustLevels.length} niveles de acceso restrictivos basados en subredes de red, geolocalización o cumplimiento de postura de seguridad del dispositivo.`;
     }
 
     Logger.log(` Estado final determinado: ${respuestaConcreta} | Riesgo: ${riesgo025}`);

@@ -50,8 +50,6 @@ function AuditoriaIdentidadIdentificacion() {
       new ManualUserAuditStrategy(), //29
       new DeprovisioningAuditStrategy(), //30
       new SlaOffboardingAuditStrategy(), //31
-      new SecurityAlertsAuditStrategy(), //32
-      new GroupExposureAuditStrategy(authHeader),//33
       
       // Integrando estrategias previamente no llamadas
       new PostSsoLoginPolicyStrategy(customerId),
@@ -129,7 +127,7 @@ function AuditoriaAdministracion() {
       new GoogleVoiceAdminRoleStrategy(customerId, voiceAdminRoleId),
       new MobileAdminRoleStrategy(customerId, mobileAdminRoleId),
       new ServicesAdminRoleStrategy(customerId, servicesAdminRoleId),
-      new VaultSuperAdminLicenseAuditStrategy(customerId, superAdminRoleId),
+      // new VaultSuperAdminLicenseAuditStrategy(customerId, superAdminRoleId),
       new VaultAccessControlStrategy(customerId)
     ];
 

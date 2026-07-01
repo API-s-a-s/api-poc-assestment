@@ -48,7 +48,7 @@ class UserManagementAdminRoleStrategy extends ApiStrategy {
     // 1. FILTRAR USUARIOS CON EL ROL ESPECÍFICO DELEGADO POR OU
     const adminsList = [];
     const delegationDetails = [];
-    // NUEVO: También detectamos admins con el mismo rol a nivel global (CUSTOMER)
+    // También detectamos admins con el mismo rol a nivel global (CUSTOMER)
     const globalAdminsList = [];
     
     for (const user of census) {
@@ -77,13 +77,11 @@ class UserManagementAdminRoleStrategy extends ApiStrategy {
     }
     
     const adminCount = adminsList.length;    
-    const porcentajeNum = Math.round((adminCount / totalAdmins) * 100);
-
+    
     // --- 2. LÓGICA DE SALIDA Y APLICACIÓN DE REGLAS DE NEGOCIO ---
-    let respuestaConcreta;
+    // CORREGIDO: Ahora guarda la proporción exacta "X de Y" alineada con el comentario
+    const respuestaConcreta = `${adminCount} de ${totalAdmins}`;
     let riesgo036, comentario036;
-
-    respuestaConcreta = `${porcentajeNum}%`;
 
     if (adminCount > 0) {
       // Delegar por OU es una buena práctica (Principio de menor privilegio), pero aún así debe ser auditado

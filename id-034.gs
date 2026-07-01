@@ -1,27 +1,19 @@
 /**
  * Estrategia para auditar si los Súper Administradores tienen acceso efectivo a Google Vault.
  * 
- * Esta estrategia ABANDONA la consulta a la Policy API de Cloud Identity
- * (vault.service_status) porque:
+ * ══════════════════════════════════════════════════════════════════════════
+ * ARQUITECTURA DE EVALUACIÓN MULTICAPA
+ * ══════════════════════════════════════════════════════════════════════════
  * 
- *   1. La OU raíz siempre devuelve ENABLED por defecto (falso positivo).
- *   2. Los Súper Admins eluden restricciones de servicio por OU.
- *   3. Un Súper Admin puede autoasignarse privilegios de Vault en cualquier momento.
+ * Esta estrategia combina dos barreras de control:
+ *   1. Estado del Servicio (Policy API en RAM): Verifica si Google Vault está 
+ *      explícitamente deshabilitado para la OU Raíz.
+ *   2. Licenciamiento (Censo en RAM): Verifica si los Súper Admins poseen un SKU 
+ *      que incluya Vault.
  * 
- * En su lugar, implementa una auditoría multicapa basada en LICENCIAS:
- * 
- *   Paso 1 (Directorio): Identifica Súper Admins globales desde el censo en RAM.
- *   Paso 2 (Licencias):  Para cada Súper Admin, evalúa si posee un SKU que
- *                         incluya Google Vault (Enterprise, Business Plus, Add-ons).
- *   Paso 3 (Evaluación): Emite el diagnóstico final basado en licencias activas.
- * 
- * A partir de noviembre de 2025, la ÚNICA barrera técnica real que impide a un
- * Súper Administrador interactuar con eDiscovery es la ausencia de una licencia
- * activa que incluya Google Vault.
- * 
- * Fuentes de datos:
- *   - Censo en RAM O(1): 00-core-censo.gs (usuarios, roles, licencias)
- *   - NO realiza llamadas adicionales a ninguna API.
+ * La Policy API omite la política cuando Vault usa su estado por defecto 
+ * (habilitado para todos). Si no se encuentra 'vault.service_status', se 
+ * asume Habilitado (Por defecto).
  * 
  * Contiene la lógica de negocio para ID-034.
  */
@@ -36,16 +28,11 @@ class VaultSuperAdminLicenseAuditStrategy extends ApiStrategy {
         scoreKey: "score034"
       }
     ];
-    super("Google Vault Super Admin License Audit", configIDs);
+    super("Google Vault Super Admin Access Audit", configIDs);
     this.customerId = customerId;
     this.superAdminRoleId = superAdminRoleId;
     this.category = "Administración";
 
-    /**
-     * SKUs de riesgo: licencias que incluyen acceso a Google Vault.
-     * Formato del censo: "/product/Google-Apps/sku/{skuId}"
-     * Ref: https://developers.google.com/admin-sdk/licensing/v1/how-tos/products
-     */
     this.VAULT_RISK_SKUS = [
       "/product/Google-Apps/sku/1010020020",  // Google Workspace Enterprise Standard
       "/product/Google-Apps/sku/1010020025",  // Google Workspace Enterprise Plus
@@ -58,80 +45,48 @@ class VaultSuperAdminLicenseAuditStrategy extends ApiStrategy {
     ];
   }
 
-  // Traductor estandarizado: Convierte la palabra clave del riesgo a valor numérico
   calcularScoreDeRiesgo(nivelRiesgo) {
     if (!nivelRiesgo) return null;
     const riesgoNormalizado = nivelRiesgo.toString().trim().toLowerCase();
-    
     if (riesgoNormalizado === "alto") return 1;
     if (riesgoNormalizado === "medio") return 2;
     if (riesgoNormalizado === "bajo") return 3;
-    
     return null;
   }
 
-  /**
-   * Función helper: Verifica si un usuario del censo tiene al menos un SKU
-   * que incluya acceso a Google Vault.
-   * 
-   * @param {Object} userObj - Objeto del censo con la propiedad `licenses` (array de strings).
-   * @return {{ tieneVault: boolean, skusConVault: string[] }} Resultado de la verificación.
-   */
   _verificarLicenciaVaultAdmin(userObj) {
     try {
       const userLicenses = userObj.licenses || [];
-
-      if (userLicenses.length === 0) {
-        Logger.log(`[ID-034] ${userObj.email}: Sin licencias asignadas → Sin acceso a Vault.`);
-        return { tieneVault: false, skusConVault: [] };
-      }
-
-      // Intersección: licencias del usuario ∩ SKUs de riesgo
+      if (userLicenses.length === 0) return { tieneVault: false, skusConVault: [] };
       const skusConVault = userLicenses.filter(sku => this.VAULT_RISK_SKUS.includes(sku));
-
-      if (skusConVault.length > 0) {
-        Logger.log(`[ID-034] ${userObj.email}: POSEE licencia(s) con Vault → ${skusConVault.join(", ")}`);
-      } else {
-        Logger.log(`[ID-034] ${userObj.email}: Licencias activas sin Vault (${userLicenses.length} SKU(s) asignados).`);
-      }
-
       return { tieneVault: skusConVault.length > 0, skusConVault: skusConVault };
     } catch (e) {
-      Logger.log(`[ID-034] ERROR al verificar licencias de ${userObj.email || "desconocido"}: ${e.message}`);
       return { tieneVault: false, skusConVault: [] };
     }
   }
 
   evaluateInMemory(globalContext) {
-    const { census } = globalContext;
+    const { census, policies } = globalContext;
 
-    if (!census) {
-      return this._buildErrorResponse("Falta el contexto global (censo no encontrado en memoria).");
+    if (!census || !policies) {
+      return this._buildErrorResponse("Falta el contexto global (censo o políticas no encontradas en memoria).");
     }
 
-    Logger.log("========== INICIO DIAGNÓSTICO ID-034 (VAULT + LICENCIAS SUPER ADMINS) ==========");
+    Logger.log("========== INICIO DIAGNÓSTICO ID-034 (VAULT: SERVICIO + LICENCIAS) ==========");
 
     // =====================================================================
     // PASO 1: Identificar Súper Admins globales desde el censo en RAM
-    // Un Súper Admin se identifica por:
-    //   - user.isAdmin === true
-    //   - Al menos un rol con roleName que incluya "super admin" Y
-    //     scopeType === "CUSTOMER" (alcance global, no por OU)
     // =====================================================================
     const superAdminsList = [];
 
     for (const user of census) {
-      // Un usuario es Súper Admin si tiene el flag nativo isAdmin = true 
-      // O si tiene el rol asignado explícitamente en su array de adminRoles
       let isSuperAdmin = user.isAdmin === true;
-      
       if (!isSuperAdmin && user.adminRoles && user.adminRoles.length > 0) {
         isSuperAdmin = user.adminRoles.some(role => 
           (role.roleId === this.superAdminRoleId || role.roleName.toLowerCase().includes("super admin"))
           && role.scopeType === "CUSTOMER"
         );
       }
-
       if (isSuperAdmin) {
         superAdminsList.push(user);
       }
@@ -140,67 +95,79 @@ class VaultSuperAdminLicenseAuditStrategy extends ApiStrategy {
     const superAdminCount = superAdminsList.length;
     Logger.log(`[ID-034] Súper Admins globales detectados: ${superAdminCount}`);
 
-    if (superAdminCount > 0) {
-      Logger.log(`[ID-034] Cuentas Súper Admin: ${superAdminsList.map(u => u.email).join(", ")}`);
-    }
-
     // =====================================================================
-    // PASO 2: Evaluar licencias con Vault para cada Súper Admin
-    // Se reutiliza el array user.licenses del censo (poblado por
-    // CensusStateWrapper._buildLicensesHashMap en 00-core-censo.gs).
-    // NO se realizan llamadas adicionales a la API.
+    // PASO 2: Evaluar el estado del servicio de Vault desde policies en RAM
     // =====================================================================
-    const adminsConVault = [];   // Súper Admins CON licencia que incluye Vault
-    const adminsSinVault = [];   // Súper Admins SIN licencia que incluye Vault
-    const details = [];          // Array de strings para trazabilidad
+    let vaultStatus = "Habilitado (Por defecto)";
+    let vaultExplicitlyDisabled = false;
 
-    for (const admin of superAdminsList) {
-      const resultado = this._verificarLicenciaVaultAdmin(admin);
+    try {
+      const vaultPolicies = policies.filter(p => p.setting && p.setting.type === "vault.service_status");
+      
+      if (vaultPolicies.length > 0) {
+        // Encontrar la política aplicable a la OU Raíz
+        const rootPolicy = PolicyReducerFactory.getEffectiveRootPolicy(vaultPolicies, "vault.service_status") || vaultPolicies[0];
+        
+        if (rootPolicy && rootPolicy.setting) {
+          const nodeStr = JSON.stringify(rootPolicy.setting).toUpperCase();
+          const isEnabled = nodeStr.includes('"STATE":"ENABLED"') || 
+                            nodeStr.includes('"SERVICESTATE":"ENABLED"') ||
+                            nodeStr.includes('"ENABLED":TRUE');
 
-      if (resultado.tieneVault) {
-        adminsConVault.push(admin.email);
-        details.push(`⚠ ${admin.email} → Tiene acceso a Vault (SKU: ${resultado.skusConVault.join(", ")})`);
-      } else {
-        adminsSinVault.push(admin.email);
-        details.push(`✓ ${admin.email} → Sin licencia de Vault (mitigado)`);
+          if (isEnabled) {
+            vaultStatus = "Habilitado (Explícito)";
+          } else {
+            vaultStatus = "Deshabilitado (Explícito)";
+            vaultExplicitlyDisabled = true;
+          }
+        }
       }
+    } catch (e) {
+      Logger.log(`[ID-034] Error al evaluar estado de Vault en memoria: ${e.message}`);
+      vaultStatus = "Habilitado (Por defecto - Error en lectura)";
     }
 
-    Logger.log(`[ID-034] Resultado de licencias: ${adminsConVault.length} con Vault, ${adminsSinVault.length} sin Vault.`);
+    Logger.log(`[ID-034] Estado del servicio Vault en la raíz: ${vaultStatus}`);
 
     // =====================================================================
-    // PASO 3: Diagnóstico final basado en licencias
-    //
-    //   - Si hay Súper Admins con licencias activas de Vault → NON_COMPLIANT (Alto)
-    //   - Si hay Súper Admins pero ninguno tiene licencia con Vault → COMPLIANT (Bajo)
-    //   - Si no hay Súper Admins detectados → NOT_APPLICABLE
+    // PASO 3: Evaluar licencias y emitir diagnóstico final
     // =====================================================================
     let respuestaConcreta;
     let riesgo034, comentario034;
 
     if (superAdminCount === 0) {
-      // Caso defensivo: No se detectaron Súper Admins
       respuestaConcreta = "NOT_APPLICABLE";
       riesgo034 = "Bajo";
       comentario034 = "No se detectaron cuentas con el rol de Súper Administrador global en el dominio. El control no es aplicable.";
-      details.push("ℹ Sin Súper Administradores en el dominio.");
-    } else if (adminsConVault.length > 0) {
-      // NON_COMPLIANT: Existen Súper Admins con acceso efectivo irrevocable a Vault
-      respuestaConcreta = "Habilitado";
-      riesgo034 = "Alto";
-      comentario034 = `${adminsConVault.length} de ${superAdminCount} cuentas de súper administrador poseen una licencia activa que incluye Google Vault (${adminsConVault.join(", ")}). Esto les otorga acceso efectivo e irrevocable a eDiscovery y búsquedas  de todo el dominio.`;
-    } else {
-      // COMPLIANT: Hay Súper Admins pero ninguno tiene licencia con Vault
-      respuestaConcreta = "Deshabilitado";
+    } else if (vaultExplicitlyDisabled) {
+      respuestaConcreta = "COMPLIANT (Servicio Apagado)";
       riesgo034 = "Bajo";
-      comentario034 = `Los ${superAdminCount} Súper Administradores del dominio no poseen licencias que incluyan Google Vault (${adminsSinVault.join(", ")}). Sin una licencia activa con Vault, la plataforma de eDiscovery bloquea su acceso independientemente de sus roles administrativos.`;
+      comentario034 = `Postura segura. El servicio de Google Vault está explícitamente deshabilitado a nivel global. Los ${superAdminCount} Súper Administrador(es) del dominio no pueden acceder a eDiscovery independientemente de sus licencias.`;
+    } else {
+      // Si el servicio está habilitado (por defecto o explícito), dependemos de las licencias
+      const adminsConVault = [];
+      const adminsSinVault = [];
+
+      for (const admin of superAdminsList) {
+        const resultado = this._verificarLicenciaVaultAdmin(admin);
+        if (resultado.tieneVault) adminsConVault.push(admin.email);
+        else adminsSinVault.push(admin.email);
+      }
+
+      if (adminsConVault.length > 0) {
+        respuestaConcreta = `NON_COMPLIANT (${vaultStatus})`;
+        riesgo034 = "Alto";
+        comentario034 = `ALERTA: Google Vault se encuentra ${vaultStatus.toLowerCase()} y ${adminsConVault.length} Súper Administrador(es) poseen una licencia activa de Vault (${adminsConVault.join(", ")}). Esto les otorga acceso irrevocable a eDiscovery. Se recomienda deshabilitar el servicio de Vault para Súper Admins o retirarles la licencia.`;
+      } else {
+        respuestaConcreta = `COMPLIANT (Sin Licencia)`;
+        riesgo034 = "Bajo";
+        comentario034 = `Postura segura mitigada. Aunque Vault está ${vaultStatus.toLowerCase()}, los ${superAdminCount} Súper Administrador(es) del dominio no poseen licencias que incluyan Vault. Sin licencia activa, la plataforma bloquea su acceso.`;
+      }
     }
 
     Logger.log(`[ID-034] Diagnóstico final: ${respuestaConcreta} | Riesgo: ${riesgo034}`);
-    Logger.log(`[ID-034] Detalles: ${JSON.stringify(details)}`);
     Logger.log("========== FIN DIAGNÓSTICO ID-034 ==========");
 
-    // 4. RETORNAR EL OBJETO CONSOLIDADO
     return {
       name: this.name,
       valorPrincipal: respuestaConcreta,

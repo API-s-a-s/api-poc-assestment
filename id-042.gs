@@ -145,7 +145,7 @@ class VaultAccessControlStrategy extends ApiStrategy {
     let riesgo042, comentario042;
 
     const porcentajeNum = totalAdmins > 0 ? Math.round((totalConAcceso / totalAdmins) * 100) : 0;
-    respuestaConcreta = `${porcentajeNum}%`;
+    respuestaConcreta = `${totalConAcceso} de ${totalAdmins}`;
 
     if (totalConAcceso === 0) {
       riesgo042 = "Bajo";

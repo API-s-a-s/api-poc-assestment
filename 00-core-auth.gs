@@ -224,5 +224,5 @@ const base64Header = Utilities.base64EncodeWebSafe(jwtHeader).replace(/=+$/, '')
   getAndroidAdminRoleId() { return this._getRoleIdBySystemName("_MOBILE_ADMIN_ROLE"); }
   getVoiceAdminRoleId()   { return this._getRoleIdBySystemName("_GOOGLE_VOICE_ADMIN_ROLE"); }
   getMobileAdminRoleId()  { return this._getRoleIdBySystemName("_MOBILE_ADMIN_ROLE"); }
-  getServicesAdminRoleId(){ return this._getRoleIdBySystemName("_SERVICES_ADMIN_ROLE"); }
+  getServicesAdminRoleId(){ return this._getRoleIdBySystemName("_SERVICE_ADMIN_ROLE"); }
 }

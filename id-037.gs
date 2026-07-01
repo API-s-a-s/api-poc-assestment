@@ -83,7 +83,7 @@ class HelpDeskAdminRoleStrategy extends ApiStrategy {
     let respuestaConcreta;
     let riesgo037, comentario037;
 
-    respuestaConcreta = `${porcentajeNum}%`;
+    respuestaConcreta = `${adminCount} de ${totalAdmins}`;
 
     if (adminCount > 0) {
       // Delegar Help Desk por OU es una buena práctica (menor privilegio)

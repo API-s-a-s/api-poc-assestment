@@ -56,7 +56,7 @@ class ServicesAdminRoleStrategy extends ApiStrategy {
       const hasGlobalServicesAdmin = user.adminRoles.some(role => 
         // Criterio primario: roleId numérico real (resuelto dinámicamente por AuthService)
         // Criterio secundario (fallback): coincidencia por nombre del sistema
-        (role.roleId === this.roleId || role.roleName.toLowerCase().includes("services admin")) 
+        (role.roleId === this.roleId || role.roleName.toLowerCase().includes("service admin")) 
         && role.scopeType === "CUSTOMER" // Asegura que el poder es sobre toda la empresa (Raíz)
       );
       
@@ -72,12 +72,12 @@ class ServicesAdminRoleStrategy extends ApiStrategy {
     let respuestaConcreta;
     let riesgo038, comentario038;
 
-    // Imprimimos el porcentaje como métrica principal, acompañado del número absoluto
-    respuestaConcreta = `${porcentajeNum}%`;
+    // Imprimimos el conteo como métrica principal
+    respuestaConcreta = `${adminCount} de ${totalAdmins}`;
 
     if (adminCount > 0) {
       riesgo038 = "Medio";
-      comentario038 = `ATENCIÓN: ${adminCount} de ${totalAdmins} administradores tienen el rol global de Administrador de Servicios. Este rol permite gestionar la configuración y permisos de los servicios principales y adicionales en todo el dominio. Se recomienda revisar estas cuentas siguiendo el principio de menor privilegio.`;
+      comentario038 = `${adminCount} de ${totalAdmins} administradores tienen el rol global de Administrador de Servicios. Este rol permite gestionar la configuración y permisos de los servicios principales y adicionales en todo el dominio. Se recomienda revisar estas cuentas siguiendo el principio de menor privilegio.`;
     } else {
       riesgo038 = "Bajo";
       comentario038 = `Postura segura. ${adminCount} de ${totalAdmins} administradores tienen el rol global de Administrador de Servicios. No hay usuarios delegados con control global sobre las configuraciones de servicios.`;

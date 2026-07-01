@@ -46,44 +46,61 @@ class GoogleVoiceAdminRoleStrategy extends ApiStrategy {
       return this._buildErrorResponse("El censo no contiene usuarios administradores para auditar.");
     }
 
-    // 1. FILTRAR USUARIOS CON EL ROL ESPECÍFICO A NIVEL GLOBAL
+    // 1. FILTRAR USUARIOS CON EL ROL ESPECÍFICO
     const adminsList = [];
+    const delegationDetails = [];
+    const globalAdminsList = [];
     
     for (const user of census) {
-      // Ignoramos si no tiene el flag de admin o si su arreglo de roles viene vacío
       if (!user.isAdmin || !user.adminRoles || user.adminRoles.length === 0) continue;
 
-      const hasGlobalVoiceAdmin = user.adminRoles.some(role => 
-        // Se evalúa coincidencia por ID o por nombre estandarizado ("voice admin")
-        (role.roleId === this.roleId || role.roleName.toLowerCase().includes("voice admin")) 
-        && role.scopeType === "CUSTOMER" // Asegura que el poder es sobre toda la empresa (Raíz)
+      const matchingRoles = user.adminRoles.filter(role => 
+        (role.roleId === this.roleId || role.roleName.toLowerCase().includes("voice admin"))
       );
+
+      const ouDelegations = matchingRoles.filter(role => role.scopeType === "ORG_UNIT");
+      const globalDelegations = matchingRoles.filter(role => role.scopeType === "CUSTOMER");
       
-      if (hasGlobalVoiceAdmin) {
+      if (ouDelegations.length > 0) {
         adminsList.push(user.email || user.id);
+        ouDelegations.forEach(del => {
+          delegationDetails.push(`${user.email} (OU Delegada: ${del.orgUnitId})`);
+        });
+      }
+
+      if (globalDelegations.length > 0) {
+        globalAdminsList.push(user.email || user.id);
       }
     }
     
     const adminCount = adminsList.length;    
-    const porcentajeNum = Math.round((adminCount / totalAdmins) * 100);
+    const globalCount = globalAdminsList.length;
+    const totalRoleHolders = adminCount + globalCount;
 
     // --- 2. LÓGICA DE SALIDA Y APLICACIÓN DE REGLAS DE NEGOCIO ---
-    let respuestaConcreta = `${porcentajeNum}%`;
+    let respuestaConcreta = `${totalRoleHolders} de ${totalAdmins}`;
     let riesgo040, comentario040;
 
-    // Comentarios cortos y directos usando el formato "X de Y"
-    if (adminCount > 0) {
-      riesgo040 = "Medio";
-      comentario040 = `${adminCount} de ${totalAdmins} administradores tienen el rol global de Administrador de Google Voice. Se recomienda delegar por OU (Unidad Organizativa) en lugar de dar acceso global.`;
+    if (totalRoleHolders > 0) {
+      if (globalCount > 0) {
+        riesgo040 = "Medio";
+        comentario040 = `${globalCount} administrador(es) tienen el rol global de Administrador de Google Voice. Se recomienda delegar por OU (Unidad Organizativa) en lugar de dar acceso global.`;
+      } else {
+        riesgo040 = "Bajo";
+        comentario040 = `Buenas prácticas: ${adminCount} administrador(es) tienen el rol de Google Voice delegado correctamente por OU. No hay asignaciones globales.`;
+      }
     } else {
       riesgo040 = "Bajo";
-      comentario040 = `${adminCount} de ${totalAdmins} administradores tienen el rol global de Administrador de Google Voice.`;
+      comentario040 = `Postura segura. Ningún administrador tiene el rol de Administrador de Google Voice asignado.`;
     }
 
     // Trazabilidad técnica para la consola
     Logger.log(`[LOG] Voice Admin Audit (In-Memory): Resultado -> ${respuestaConcreta} | Riesgo: ${riesgo040}`);
+    if (globalCount > 0) {
+      Logger.log(`[ID-040] Cuentas con el rol de Administrador de Google Voice Global: ${globalAdminsList.join(", ")}`);
+    }
     if (adminCount > 0) {
-      Logger.log(`[ID-040] Cuentas con el rol de Administrador de Google Voice Global: ${adminsList.join(", ")}`);
+      Logger.log(`[ID-040] Administradores delegados por OU:\n${delegationDetails.join("\n")}`);
     }
 
     // 3. RETORNAR EL OBJETO CONSOLIDADO

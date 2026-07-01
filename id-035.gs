@@ -71,7 +71,7 @@ class GroupsAdminRoleAssignmentStrategy extends ApiStrategy {
     let riesgo035, comentario035;
 
     // Imprimimos el porcentaje como métrica principal, acompañado del número absoluto
-    respuestaConcreta = `${porcentajeNum}%`;
+    respuestaConcreta = `${adminCount} de ${totalUsuarios}`;
 
     if (adminCount > 0) {
       riesgo035 = "Medio";
