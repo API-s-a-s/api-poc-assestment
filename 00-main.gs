@@ -22,7 +22,8 @@ function AuditoriaIdentidadIdentificacion() {
     const politicas = policyQuery.fetchTree();
     const globalContext = {
       census: censo,
-      policies: politicas
+      policies: politicas,
+      auth: auth
     };
     const auditor = new SecurityAuditorFacade(auth, globalContext);
 
@@ -104,7 +105,8 @@ function AuditoriaAdministracion() {
     
     const globalContext = {
       census: censo,
-      policies: politicas
+      policies: politicas,
+      auth: auth
     };
     
     const auditor = new SecurityAuditorFacade(auth, globalContext);
@@ -127,7 +129,7 @@ function AuditoriaAdministracion() {
       new GoogleVoiceAdminRoleStrategy(customerId, voiceAdminRoleId),
       new MobileAdminRoleStrategy(customerId, mobileAdminRoleId),
       new ServicesAdminRoleStrategy(customerId, servicesAdminRoleId),
-      // new VaultSuperAdminLicenseAuditStrategy(customerId, superAdminRoleId),
+      new VaultSuperAdminLicenseAuditStrategy(customerId, superAdminRoleId),
       new VaultAccessControlStrategy(customerId)
     ];
 
@@ -184,7 +186,8 @@ function AuditoriasAppsExternas() {
     
     const globalContext = {
       census: censo,
-      policies: politicas
+      policies: politicas,
+      auth: auth
     };
     
     const auditor = new SecurityAuditorFacade(auth, globalContext);
@@ -261,7 +264,8 @@ function AuditoriasEmail() {
     
     const globalContext = {
       census: censo,
-      policies: politicas
+      policies: politicas,
+      auth: auth
     };
     
     const auditor = new SecurityAuditorFacade(auth, globalContext);
@@ -365,7 +369,8 @@ function AuditoriaDrive() {
     
     const globalContext = {
       census: censo,
-      policies: politicas
+      policies: politicas,
+      auth: auth
     };
     
     // Instanciamos el facade
