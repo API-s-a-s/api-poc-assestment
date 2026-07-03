@@ -432,3 +432,93 @@ function AuditoriaDrive() {
     ui.alert("❌ Error: " + error.message);
   }
 }
+
+/**
+ * Orquestador principal para la auditoría de Servicios Adicionales (Calendar, etc.)
+ */
+function AuditoriaServiciosAdicionales() {
+  const ui = SpreadsheetApp.getUi();
+  
+  try {
+    const auth = new AuthService();
+    
+    // Extracción de variables comunes que podríamos necesitar
+    const customerId = auth.getCustomerId();
+
+    // 0. Inicializar contexto global en RAM (Censo de usuarios con roles y Políticas)
+    const censoWrapper = new CensusStateWrapper();
+    censoWrapper.buildAndStoreCensus(auth, customerId);
+    const censo = censoWrapper.getCensus();
+    // Inyectar diccionario OU ID → Path al motor CEL para resolución de OUs
+    CELParserEngine.ouIdToPathMap = censoWrapper.getOuMap();
+    
+    const policyQuery = new GlobalPolicyExtractor(auth, customerId);
+    const politicas = policyQuery.fetchTree();
+    
+    const globalContext = {
+      census: censo,
+      policies: politicas,
+      auth: auth
+    };
+    
+    // Instanciamos el facade
+    const auditor = new SecurityAuditorFacade(auth, globalContext);
+
+    // --- 1. DEFINICIÓN DE ESTRATEGIAS ---
+    const estrategias = [
+      new CalendarPrimaryExternalSharingStrategy(customerId),
+      new CalendarExternalInvitationsStrategy(customerId),
+      new CalendarSecondaryExternalSharingStrategy(customerId),      
+      new CalendarInteroperability(customerId),
+      new ContactsExternalDirectorySharingStrategy(customerId),
+      new GroupsSharingExternalMembersStrategy(customerId),
+      new GroupsViewTopicsDefaultAccessStrategy(customerId),
+      new GroupsCreateGroupsAccessStrategy(customerId),
+      new GroupsOwnersAllowExternalMembersStrategy(customerId),
+      new GroupsSettingsAccessStrategy(customerId),
+      new GroupsSpamModerationStrategy(customerId),
+      new SitesCreationModificationStrategy(customerId),
+      new SitesDriveExternalSharingStrategy(customerId),
+      new ChatHistorySettingsStrategy(customerId),
+      new ChatExternalWarningStrategy(customerId),
+      new ChatAllowExternalChatsStrategy(customerId),
+      new ChatFileSharingStrategy(customerId),
+      new GoogleTakeoutStatusStrategy(customerId),
+      new LookerDataStudioSharingStrategy(customerId),
+      new AdditionalServicesToSAuditStrategy(customerId),
+      
+    ];
+
+    // --- 2. REGISTRO DE ESTRATEGIAS ---
+    estrategias.forEach(estrategia => auditor.addStrategy(estrategia));
+
+    // Si no hay estrategias aún, avisamos y salimos para no ejecutar en vacío
+    if (estrategias.length === 0) {
+      ui.alert("El módulo de Servicios Adicionales está listo, pero aún no tiene métricas asignadas.");
+      return;
+    }
+
+    // --- 3. EJECUCIÓN ---
+    ui.showModelessDialog(HtmlService.createHtmlOutput("⏳ Procesando auditoría de Servicios Adicionales, puede tomar algunos segundos..."), "Estado");
+    
+    const resultados = auditor.ejecutarTodo();
+    
+    // --- 4. ESCRITURA EN SHEETS (Polimorfismo) ---
+    resultados.forEach(res => {
+      const estrategiaResponsable = estrategias.find(e => e.name === res.name);
+      
+      if (estrategiaResponsable && res) {
+        estrategiaResponsable.writeToSheet(res); 
+      }
+    });
+    
+    // --- 5. FINALIZACIÓN ---
+    generarResumenSemaforo();
+    ui.alert("✅ Auditoría de Servicios Adicionales completada con éxito.");
+
+  } catch (error) {
+    Logger.log("Error en auditoría de Servicios Adicionales: " + error.stack);
+    ui.alert("❌ Error: " + error.message);
+  }
+}
+
