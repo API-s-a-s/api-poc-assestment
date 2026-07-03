@@ -1,6 +1,6 @@
 /**
  * Estrategia para auditar si se permite publicar archivos de Google Drive al mundo (Internet).
- * Evalúa la propiedad booleana allowPublishingFiles.
+ * Evalúa la propiedad booleana allow_publishing_files.
  * Utiliza Cloud Identity Policy API (v1).
  * setting.type: settings/drive_and_docs.external_sharing
  */
@@ -37,6 +37,12 @@ class DriveAllowPublishingFilesStrategy extends ApiStrategy {
 
     // Filtro específico: solo la política de external_sharing de Drive
     const sharingPolicies = policies.filter(p => p.setting && (p.setting.type || "").endsWith("drive_and_docs.external_sharing"));
+    Logger.log(`[ID-097] Se encontraron ${sharingPolicies.length} políticas en memoria para este filtro.`);
+    if (sharingPolicies.length > 0) {
+      Logger.log(`[ID-097] Detalles de las políticas encontradas: ` + JSON.stringify(sharingPolicies.map(p => ({ type: p.type, name: p.name, sortOrder: p.policyQuery?.sortOrder, hasGroup: !!p.policyQuery?.group, orgUnit: p.policyQuery?.orgUnit }))));
+    } else {
+      Logger.log(`[ID-097] [WARNING] La API masiva no trajo configuraciones para esta política. Esto puede explicar el retorno NULL o valores por defecto.`);
+    }
 
     let allowPublishing = false;
     let isSharingDisallowed = false;
@@ -48,12 +54,12 @@ class DriveAllowPublishingFilesStrategy extends ApiStrategy {
         rawData = rootPolicy;
         const valueNode = rootPolicy.setting.value || rootPolicy.setting;
         
-        // Campos en camelCase según la API real
-        if (valueNode.externalSharingMode === "DISALLOWED") {
+        // Campos modificados a snake_case según la API
+        if (valueNode.external_sharing_mode === "DISALLOWED") {
           isSharingDisallowed = true;
         }
 
-        if (valueNode.allowPublishingFiles === true) {
+        if (valueNode.allow_publishing_files === true) {
           allowPublishing = true;
         }
       }

@@ -34,6 +34,12 @@ class DriveAllowedPartiesDownloadPrintCopyStrategy extends ApiStrategy {
     if (!policies) return this._buildErrorResponse("Falta el contexto global.");
 
     const targetPolicies = policies.filter(p => p.setting && (p.setting.type || "").endsWith("drive_and_docs.shared_drive_creation"));
+    Logger.log(`[ID-106] Se encontraron ${targetPolicies.length} políticas en memoria para este filtro.`);
+    if (targetPolicies.length > 0) {
+      Logger.log(`[ID-106] Detalles de las políticas encontradas: ` + JSON.stringify(targetPolicies.map(p => ({ type: p.type, name: p.name, sortOrder: p.policyQuery?.sortOrder, hasGroup: !!p.policyQuery?.group, orgUnit: p.policyQuery?.orgUnit }))));
+    } else {
+      Logger.log(`[ID-106] [WARNING] La API masiva no trajo configuraciones para esta política. Esto puede explicar el retorno NULL o valores por defecto.`);
+    }
     
     let extractedValue = "ALL";
     let rawData = null;

@@ -395,8 +395,9 @@ function AuditoriaDrive() {
       new DriveAllowedPartiesDownloadPrintCopyStrategy(customerId),
       new DriveDefaultFileAccessStrategy(customerId),
       new DriveSdkApiAccessStrategy(customerId),
-      new DriveForDesktopStrategy(customerId)
-
+      new DriveForDesktopAuthorizedDevicesStrategy(customerId),
+      new WorkspaceMarketplaceAppsAllowlistStrategy(customerId),
+      new DataLossPreventionRulesStrategy(customerId)
     ];
 
     // --- 2. REGISTRO DE ESTRATEGIAS ---

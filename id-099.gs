@@ -1,6 +1,6 @@
 /**
  * Estrategia para auditar las configuraciones predeterminadas de Access Checker al compartir enlaces.
- * Evalúa el enum accessCheckerSuggestions (RECIPIENTS_OR_AUDIENCE_OR_PUBLIC, RECIPIENTS_OR_AUDIENCE, RECIPIENTS_ONLY).
+ * Evalúa el enum access_checker_suggestions (RECIPIENTS_OR_AUDIENCE_OR_PUBLIC, RECIPIENTS_OR_AUDIENCE, RECIPIENTS_ONLY).
  * Utiliza Cloud Identity Policy API (v1).
  * setting.type: settings/drive_and_docs.external_sharing
  */
@@ -37,6 +37,12 @@ class DriveAccessCheckerSuggestionsStrategy extends ApiStrategy {
 
     // Filtro específico: solo la política de external_sharing de Drive
     const sharingPolicies = policies.filter(p => p.setting && (p.setting.type || "").endsWith("drive_and_docs.external_sharing"));
+    Logger.log(`[ID-099] Se encontraron ${sharingPolicies.length} políticas en memoria para este filtro.`);
+    if (sharingPolicies.length > 0) {
+      Logger.log(`[ID-099] Detalles de las políticas encontradas: ` + JSON.stringify(sharingPolicies.map(p => ({ type: p.type, name: p.name, sortOrder: p.policyQuery?.sortOrder, hasGroup: !!p.policyQuery?.group, orgUnit: p.policyQuery?.orgUnit }))));
+    } else {
+      Logger.log(`[ID-099] [WARNING] La API masiva no trajo configuraciones para esta política. Esto puede explicar el retorno NULL o valores por defecto.`);
+    }
 
     let accessChecker = "RECIPIENTS_ONLY"; // Lo asumimos como la versión más estricta si no se define.
     let rawData = null;
@@ -47,8 +53,10 @@ class DriveAccessCheckerSuggestionsStrategy extends ApiStrategy {
         rawData = rootPolicy;
         const valueNode = rootPolicy.setting.value || rootPolicy.setting;
         
-        // Campo en camelCase según la API real
-        if (valueNode.accessCheckerSuggestions) {
+        // Campo modificado a snake_case según la API
+        if (valueNode.access_checker_suggestions) {
+          accessChecker = valueNode.access_checker_suggestions;
+        } else if (valueNode.accessCheckerSuggestions) {
           accessChecker = valueNode.accessCheckerSuggestions;
         }
       }

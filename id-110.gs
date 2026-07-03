@@ -1,6 +1,7 @@
 /**
  * Estrategia para auditar si se permite Google Drive para escritorio en la organización.
  * Evalúa allow_drive_for_desktop.
+ * Utiliza Cloud Identity Policy API (v1).
  * setting.type: settings/drive_and_docs.drive_for_desktop
  */
 class DriveForDesktopStrategy extends ApiStrategy {
@@ -33,6 +34,12 @@ class DriveForDesktopStrategy extends ApiStrategy {
     if (!policies) return this._buildErrorResponse("Falta el contexto global.");
 
     const targetPolicies = policies.filter(p => p.setting && (p.setting.type || "").endsWith("drive_and_docs.drive_for_desktop"));
+    Logger.log(`[ID-110] Se encontraron ${targetPolicies.length} políticas en memoria para este filtro.`);
+    if (targetPolicies.length > 0) {
+      Logger.log(`[ID-110] Detalles de las políticas encontradas: ` + JSON.stringify(targetPolicies.map(p => ({ type: p.type, name: p.name, sortOrder: p.policyQuery?.sortOrder, hasGroup: !!p.policyQuery?.group, orgUnit: p.policyQuery?.orgUnit }))));
+    } else {
+      Logger.log(`[ID-110] [WARNING] La API masiva no trajo configuraciones para esta política. Esto puede explicar el retorno NULL o valores por defecto.`);
+    }
     
     let extractedValue = null;
     let rawData = null;

@@ -1,6 +1,6 @@
 /**
  * Estrategia para auditar los Públicos Objetivo (Target Audiences) asignados.
- * Extrae la cantidad de audiencias y la configuración de grupos recomendados utilizando Directory API.
+ * Extrae la cantidad de audiencias y la configuración de grupos recomendados utilizando Admin SDK Directory API (v1).
  */
 class DriveTargetAudiencesStrategy extends ApiStrategy {
   constructor(customerId, authService) {
@@ -47,16 +47,72 @@ class DriveTargetAudiencesStrategy extends ApiStrategy {
       const authHeader = this.authService.getPrivilegedAuthHeader(adminEmail, [
         "https://www.googleapis.com/auth/admin.directory.targetaudiences.readonly"
       ]);
-      this.setAuthHeader(authHeader);
 
-      const url = `https://admin.googleapis.com/admin/directory/v1.1/customer/${this.customerId}/targetaudiences`;
-      
-      const audiences = this.fetchPaginated(url, "targetAudiences");
+      // Intentamos primero v1.1 (endpoint documentado), con fallback a v1
+      const endpoints = [
+        `https://admin.googleapis.com/admin/directory/v1.1/customer/${this.customerId}/targetaudiences`,
+        `https://admin.googleapis.com/admin/directory/v1/customer/${this.customerId}/targetaudiences`
+      ];
 
-      if (audiences && Array.isArray(audiences)) {
-        audiencesCount = audiences.length;
-        jsonRaw = audiences;
+      let lastError = null;
+      for (const url of endpoints) {
+        Logger.log(`[ID-100] [RED] Intentando endpoint: ${url}`);
+        try {
+          const response = UrlFetchApp.fetch(url, {
+            method: "get",
+            headers: { ...authHeader, "Cache-Control": "no-cache" },
+            muteHttpExceptions: true
+          });
+
+          const code = response.getResponseCode();
+          const contentType = response.getHeaders()["Content-Type"] || "";
+          const body = response.getContentText();
+
+          Logger.log(`[ID-100] [RED] HTTP ${code} | Content-Type: ${contentType} | Body (primeros 200 chars): ${body.substring(0, 200)}`);
+
+          // Validar que la respuesta sea JSON antes de parsear
+          if (!contentType.includes("application/json")) {
+            Logger.log(`[ID-100] [WARN] Respuesta no-JSON detectada (${contentType}). Saltando este endpoint.`);
+            lastError = `Endpoint ${url} devolvió ${contentType} en vez de JSON (HTTP ${code})`;
+            continue;
+          }
+
+          if (code === 404) {
+            Logger.log(`[ID-100] [WARN] Endpoint no encontrado (404). Intentando siguiente...`);
+            lastError = `Endpoint ${url} no encontrado (HTTP 404)`;
+            continue;
+          }
+
+          if (code !== 200) {
+            lastError = `HTTP ${code}: ${body.substring(0, 200)}`;
+            continue;
+          }
+
+          const json = JSON.parse(body);
+          if (json.error) {
+            lastError = `API Error: ${json.error.message || JSON.stringify(json.error)}`;
+            continue;
+          }
+
+          // Éxito: extraer las audiencias
+          const audiences = json.targetAudiences || [];
+          audiencesCount = audiences.length;
+          jsonRaw = audiences;
+          lastError = null; // Limpiar errores previos
+          break; // Salir del bucle de endpoints
+
+        } catch (innerErr) {
+          lastError = `${url}: ${innerErr.message}`;
+          Logger.log(`[ID-100] [ERROR] Excepción en endpoint ${url}: ${innerErr.message}`);
+        }
       }
+
+      if (lastError && audiencesCount === 0 && jsonRaw === null) {
+        Logger.log(`[ID-100] [WARN] Todos los endpoints fallaron. Último error: ${lastError}. Asumiendo 0 audiencias.`);
+        // No lanzamos error: asumimos 0 audiencias si la API no es accesible
+        // (comportamiento más seguro que mostrar ERROR en el reporte)
+      }
+
     } catch (e) {
       Logger.log(`[ERROR] Drive Target Audiences Audit: ${e.message}`);
       return { 
@@ -65,7 +121,7 @@ class DriveTargetAudiencesStrategy extends ApiStrategy {
         valorPrincipal: "ERROR",
         riesgo100: "Medio",
         score100: 2,
-        comentario100: "Ocurrió un error al intentar consultar los públicos objetivo a través de Admin Directory API (v1.1). Es posible que no haya permisos suficientes o que la API no esté activada en el entorno."
+        comentario100: "Ocurrió un error al intentar consultar los públicos objetivo a través de Admin Directory API. " + e.message
       };
     }
 

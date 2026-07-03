@@ -1,13 +1,25 @@
 /**
- * Estrategia para auditar si se permite acceder a Google Drive con la API de Drive SDK.
- * Evalúa enable_drive_sdk_api_access.
- * setting.type: settings/drive_and_docs.drive_sdk (o similar, se infiere con "drive_sdk")
+ * ID-113: Acceso Programático y Drive SDK
+ * La exposición programática de los datos de la organización a aplicaciones de terceros
+ * (Complementos, software SaaS de nicho, aplicaciones móviles integradas) se rige mediante el Drive SDK.
+ * Ubicado bajo la configuración drive_and_docs.drive_sdk, este booleano (enable_drive_sdk_api_access en lugar de enableDriveSdkApiAccess)
+ * dictamina si los usuarios pueden autorizar de forma independiente las concesiones de tokens OAuth 2.0 a los alcances de Drive.
+ * 
+ * Arquitectónicamente, a diferencia de la mayoría de las configuraciones de uso compartido que dependen del reductor
+ * de sobrescritura rígida Max, la configuración de drive_sdk utiliza un reductor Merge. Si existen políticas conflictivas
+ * aplicadas al usuario a través de diversas membresías de grupo, el sistema fusionará (merge) los atributos de más alta
+ * prioridad para tomar la decisión final de autorización. Esta es una advertencia analítica vital; el script de validación
+ * que consulta los resultados efectivos de la raíz comprenderá que el sistema compilará las concesiones permitidas,
+ * operando consistentemente sobre valores originados en SYSTEM.
+ * 
+ * setting.type: settings/drive_and_docs.drive_sdk
  */
 class DriveSdkApiAccessStrategy extends ApiStrategy {
   constructor(customerId) {
     const configIDs = [{ id: "ID-113", valueKey: "valorPrincipal", noteKey: "comentario113", riskKey: "riesgo113", scoreKey: "score113" }];
     super("Drive SDK API Access Audit", configIDs);
     this.category = "Drive";
+    this.customerId = customerId;
   }
 
   calcularScoreDeRiesgo(nivelRiesgo) {
@@ -20,8 +32,8 @@ class DriveSdkApiAccessStrategy extends ApiStrategy {
   }
 
   evaluateInMemory(globalContext) {
-    const { policies } = globalContext;
-    if (!policies) return this._buildErrorResponse("Falta el contexto global.");
+    const { policies, auth } = globalContext;
+    if (!policies || !auth) return this._buildErrorResponse("Falta el contexto global o de autenticación.");
 
     // DIAGNÓSTICO TEMPORAL PARA BUSCAR EL ENDPOINT REAL
     const allTypes = policies.map(p => p.setting && p.setting.type).filter(Boolean);
@@ -29,7 +41,39 @@ class DriveSdkApiAccessStrategy extends ApiStrategy {
     Logger.log(`[DIAG ID-113] Políticas globales que contienen 'sdk' o 'api': ${JSON.stringify(sdkPolicies)}`);
 
     // Filtramos buscando el endpoint de Drive SDK. 
-    const targetPolicies = policies.filter(p => p.setting && p.setting.type && p.setting.type.includes("drive_sdk"));
+    let targetPolicies = policies.filter(p => p.setting && p.setting.type && p.setting.type.includes("drive_sdk"));
+    Logger.log(`[ID-113] Se encontraron ${targetPolicies.length} políticas en memoria para este filtro.`);
+    
+    // Fallback: si no está en bulk, consultar directamente a la API
+    if (targetPolicies.length === 0) {
+      Logger.log(`[ID-113] [WARNING] La API masiva no trajo configuraciones para esta política. Consultando API directamente...`);
+      try {
+        const adminEmail = auth.getCurrentUserEmail(); 
+        const privilegedHeader = auth.getPrivilegedAuthHeader(adminEmail, [
+          "https://www.googleapis.com/auth/cloud-identity.policies.readonly"
+        ]);
+
+        const filter = `customer=="customers/${this.customerId}" && setting.type.matches(".*drive_sdk.*")`;
+        const url = `https://cloudidentity.googleapis.com/v1/policies?filter=${encodeURIComponent(filter)}&t=${new Date().getTime()}`;
+
+        const options = {
+          method: "get",
+          headers: { ...privilegedHeader, "Cache-Control": "no-cache" }
+        };
+
+        const response = this.fetchWithBackoff(url, options);
+        const json = JSON.parse(response.getContentText());
+        targetPolicies = json.policies || [];
+        Logger.log(`[ID-113] [SUCCESS] API directa retornó ${targetPolicies.length} políticas.`);
+      } catch (e) {
+        Logger.log(`[ID-113] Error al consultar la API directamente: ${e.message}`);
+        return this._buildErrorResponse(`Error al consultar la API: ${e.message}`);
+      }
+    }
+    
+    if (targetPolicies.length > 0) {
+      Logger.log(`[ID-113] Detalles de las políticas encontradas: ` + JSON.stringify(targetPolicies.map(p => ({ type: p.type, name: p.name, sortOrder: p.policyQuery?.sortOrder, hasGroup: !!p.policyQuery?.group, orgUnit: p.policyQuery?.orgUnit }))));
+    }
     
     let extractedValue = null;
     let rawData = null;

@@ -238,7 +238,17 @@ class PolicyReducerFactory {
         return isCustomerLevel && !hasSubFilters;
       });
       if (tenantWide) return tenantWide;
-      Logger.log("[WARN] No se encontró política raíz (SYSTEM ni tenant-wide). Retornando null.");
+
+      // Fallback 3: La Policy API de Google no siempre devuelve políticas tipo SYSTEM para
+      // ciertas configuraciones de Drive (external_sharing, link_sharing, target_audience_link, etc.).
+      // En estos casos solo existen políticas tipo ADMIN con orgUnit asignado.
+      // Usamos el reducer (maxReducer por defecto) para seleccionar la de mayor sortOrder.
+      if (policies.length > 0) {
+        Logger.log(`[INFO] No se encontró SYSTEM ni tenant-wide para '${settingType}'. Usando fallback: política ADMIN con mayor sortOrder como raíz efectiva (${policies.length} candidatas).`);
+        return this.reduce(policies, settingType);
+      }
+
+      Logger.log("[WARN] No se encontró política raíz (SYSTEM, tenant-wide, ni ADMIN). Retornando null.");
       return null;
     }
 
@@ -269,6 +279,10 @@ class PolicyReducerFactory {
     if (applicablePolicies.length === 1) return applicablePolicies[0];
 
     // Mapeo del algoritmo reductor según el estándar de Google Cloud Identity
+    if (settingType && settingType.toLowerCase().includes("drive_sdk")) {
+      return this._mergeReducer(applicablePolicies);
+    }
+
     switch (settingType) {
       case "security.password":
       case "security.lessSecureApps":

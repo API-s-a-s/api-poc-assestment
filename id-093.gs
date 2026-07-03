@@ -1,6 +1,6 @@
 /**
  * Estrategia para auditar las opciones para compartir archivos de Google Drive externamente.
- * Evalúa si se permite compartir con cualquiera fuera de la organización (externalSharingMode).
+ * Evalúa si se permite compartir con cualquiera fuera de la organización (external_sharing_mode).
  * Utiliza Cloud Identity Policy API (v1).
  * setting.type: settings/drive_and_docs.external_sharing
  */
@@ -37,6 +37,12 @@ class DriveExternalSharingModeStrategy extends ApiStrategy {
 
     // Filtro específico: solo la política de external_sharing de Drive
     const sharingPolicies = policies.filter(p => p.setting && (p.setting.type || "").endsWith("drive_and_docs.external_sharing"));
+    Logger.log(`[ID-093] Se encontraron ${sharingPolicies.length} políticas en memoria para este filtro.`);
+    if (sharingPolicies.length > 0) {
+      Logger.log(`[ID-093] Detalles de las políticas encontradas: ` + JSON.stringify(sharingPolicies.map(p => ({ type: p.type, name: p.name, sortOrder: p.policyQuery?.sortOrder, hasGroup: !!p.policyQuery?.group, orgUnit: p.policyQuery?.orgUnit }))));
+    } else {
+      Logger.log(`[ID-093] [WARNING] La API masiva no trajo configuraciones para esta política. Esto puede explicar el retorno NULL o valores por defecto.`);
+    }
 
     let externalSharingMode = "DISALLOWED"; // Por defecto, asumimos cerrado si no hay políticas
     let rawData = null;
@@ -47,9 +53,9 @@ class DriveExternalSharingModeStrategy extends ApiStrategy {
         rawData = rootPolicy;
         const valueNode = rootPolicy.setting.value || rootPolicy.setting;
         
-        // Campo en camelCase según la API real
-        if (valueNode.externalSharingMode) {
-          externalSharingMode = valueNode.externalSharingMode;
+        // Campo modificado a snake_case en esquema JSON de la API
+        if (valueNode.external_sharing_mode) {
+          externalSharingMode = valueNode.external_sharing_mode;
         }
       }
     }

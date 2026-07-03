@@ -1,6 +1,6 @@
 /**
  * Estrategia para auditar si se permite a los usuarios recibir archivos de fuera del dominio.
- * Evalúa la propiedad booleana allowReceivingExternalFiles.
+ * Evalúa la propiedad booleana allow_receiving_external_files.
  * Utiliza Cloud Identity Policy API (v1).
  * setting.type: settings/drive_and_docs.external_sharing
  */
@@ -37,6 +37,12 @@ class DriveAllowReceivingExternalFilesStrategy extends ApiStrategy {
 
     // Filtro específico: solo la política de external_sharing de Drive
     const sharingPolicies = policies.filter(p => p.setting && (p.setting.type || "").endsWith("drive_and_docs.external_sharing"));
+    Logger.log(`[ID-098] Se encontraron ${sharingPolicies.length} políticas en memoria para este filtro.`);
+    if (sharingPolicies.length > 0) {
+      Logger.log(`[ID-098] Detalles de las políticas encontradas: ` + JSON.stringify(sharingPolicies.map(p => ({ type: p.type, name: p.name, sortOrder: p.policyQuery?.sortOrder, hasGroup: !!p.policyQuery?.group, orgUnit: p.policyQuery?.orgUnit }))));
+    } else {
+      Logger.log(`[ID-098] [WARNING] La API masiva no trajo configuraciones para esta política. Esto puede explicar el retorno NULL o valores por defecto.`);
+    }
 
     let allowReceiving = false;
     let rawData = null;
@@ -47,9 +53,11 @@ class DriveAllowReceivingExternalFilesStrategy extends ApiStrategy {
         rawData = rootPolicy;
         const valueNode = rootPolicy.setting.value || rootPolicy.setting;
         
-        // Campo en camelCase según la API real
-        if (valueNode.allowReceivingExternalFiles === true) {
-          allowReceiving = true;
+        // Campo modificado a snake_case según la API
+        if (valueNode.allow_receiving_external_files !== undefined) {
+          allowReceiving = valueNode.allow_receiving_external_files === true;
+        } else if (valueNode.allowReceivingExternalFiles !== undefined) {
+          allowReceiving = valueNode.allowReceivingExternalFiles === true;
         }
       }
     }

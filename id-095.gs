@@ -1,6 +1,6 @@
 /**
  * Estrategia para auditar las advertencias al compartir con usuarios externos a la organización.
- * Evalúa la propiedad booleana warnForExternalSharing.
+ * Evalúa la propiedad booleana warn_for_external_sharing.
  * Utiliza Cloud Identity Policy API (v1).
  * setting.type: settings/drive_and_docs.external_sharing
  */
@@ -37,6 +37,12 @@ class DriveWarnExternalSharingStrategy extends ApiStrategy {
 
     // Filtro específico: solo la política de external_sharing de Drive
     const sharingPolicies = policies.filter(p => p.setting && (p.setting.type || "").endsWith("drive_and_docs.external_sharing"));
+    Logger.log(`[ID-095] Se encontraron ${sharingPolicies.length} políticas en memoria para este filtro.`);
+    if (sharingPolicies.length > 0) {
+      Logger.log(`[ID-095] Detalles de las políticas encontradas: ` + JSON.stringify(sharingPolicies.map(p => ({ type: p.type, name: p.name, sortOrder: p.policyQuery?.sortOrder, hasGroup: !!p.policyQuery?.group, orgUnit: p.policyQuery?.orgUnit }))));
+    } else {
+      Logger.log(`[ID-095] [WARNING] La API masiva no trajo configuraciones para esta política. Esto puede explicar el retorno NULL o valores por defecto.`);
+    }
 
     let warnEnabled = false;
     let isSharingDisallowed = false;
@@ -48,12 +54,12 @@ class DriveWarnExternalSharingStrategy extends ApiStrategy {
         rawData = rootPolicy;
         const valueNode = rootPolicy.setting.value || rootPolicy.setting;
         
-        // Campos en camelCase según la API real
-        if (valueNode.externalSharingMode === "DISALLOWED") {
+        // Campos modificados a snake_case según la API
+        if (valueNode.external_sharing_mode === "DISALLOWED") {
           isSharingDisallowed = true;
         }
 
-        if (valueNode.warnForExternalSharing === true) {
+        if (valueNode.warn_for_external_sharing === true) {
           warnEnabled = true;
         }
       }

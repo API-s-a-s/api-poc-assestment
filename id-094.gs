@@ -1,6 +1,6 @@
 /**
  * Estrategia para auditar si Google Drive permite compartir SOLO con dominios en lista blanca.
- * Evalúa el mapeo de externalSharingMode a ALLOWLISTED_DOMAINS.
+ * Evalúa el mapeo de external_sharing_mode a ALLOWLISTED_DOMAINS.
  * Utiliza Cloud Identity Policy API (v1).
  * setting.type: settings/drive_and_docs.external_sharing
  */
@@ -37,6 +37,12 @@ class DriveAllowlistedDomainsSharingStrategy extends ApiStrategy {
 
     // Filtro específico: solo la política de external_sharing de Drive
     const sharingPolicies = policies.filter(p => p.setting && (p.setting.type || "").endsWith("drive_and_docs.external_sharing"));
+    Logger.log(`[ID-094] Se encontraron ${sharingPolicies.length} políticas en memoria para este filtro.`);
+    if (sharingPolicies.length > 0) {
+      Logger.log(`[ID-094] Detalles de las políticas encontradas: ` + JSON.stringify(sharingPolicies.map(p => ({ type: p.type, name: p.name, sortOrder: p.policyQuery?.sortOrder, hasGroup: !!p.policyQuery?.group, orgUnit: p.policyQuery?.orgUnit }))));
+    } else {
+      Logger.log(`[ID-094] [WARNING] La API masiva no trajo configuraciones para esta política. Esto puede explicar el retorno NULL o valores por defecto.`);
+    }
 
     let externalSharingMode = "DISALLOWED";
     let rawData = null;
@@ -47,9 +53,9 @@ class DriveAllowlistedDomainsSharingStrategy extends ApiStrategy {
         rawData = rootPolicy;
         const valueNode = rootPolicy.setting.value || rootPolicy.setting;
         
-        // Campo en camelCase según la API real
-        if (valueNode.externalSharingMode) {
-          externalSharingMode = valueNode.externalSharingMode;
+        // Campo modificado a snake_case en esquema JSON de la API
+        if (valueNode.external_sharing_mode) {
+          externalSharingMode = valueNode.external_sharing_mode;
         }
       }
     }
