@@ -116,11 +116,15 @@ class LookerDataStudioSharingStrategy extends ApiStrategy {
         const valueNode = rootPolicy.setting.value || rootPolicy.setting;
         Logger.log(`[DEBUG ID-138] Estructura interna de valueNode: ${JSON.stringify(valueNode)}`);
         
-        // Verificación de la variable de estado booleana (is_enabled / isEnabled)
+        // Verificación de la variable de estado booleana (is_enabled / isEnabled / serviceState)
         if (valueNode.is_enabled !== undefined) {
           extractedIsEnabled = valueNode.is_enabled;
         } else if (valueNode.isEnabled !== undefined) {
           extractedIsEnabled = valueNode.isEnabled;
+        } else if (valueNode.serviceState !== undefined) {
+          extractedIsEnabled = valueNode.serviceState === "ENABLED";
+        } else if (valueNode.service_state !== undefined) {
+          extractedIsEnabled = valueNode.service_state === "ENABLED";
         }
         
         Logger.log(`[DEBUG ID-138] Valor de estado extraído final: ${extractedIsEnabled}`);

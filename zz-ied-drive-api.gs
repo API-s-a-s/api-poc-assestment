@@ -100,7 +100,7 @@ function AuditoriaIEDrivePersonal() {
 }
 
 // ==========================================
-// FUNCIÓN DE PREPARACIÓN DE PESTAÑA (10 COLUMNAS)
+// FUNCIÓN DE PREPARACIÓN DE PESTAÑA
 // ==========================================
 function inicializarHojaIED() {
   const SHEET_NAME = "Auditoria IED personal";

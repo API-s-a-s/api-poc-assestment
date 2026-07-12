@@ -55,7 +55,7 @@ function AuditoriaIdentidadIdentificacion() {
       // Integrando estrategias previamente no llamadas
       new PostSsoLoginPolicyStrategy(customerId),
       new AdvancedProtectionPolicyStrategy(customerId),
-      new AdvancedProtectionPolicyCodesStrategy(customerId),
+      // new AdvancedProtectionPolicyCodesStrategy(customerId),
       
       /**
       new AdvancedProtectionPolicyStrategy(customerId), //24      
@@ -455,10 +455,38 @@ function AuditoriaServiciosAdicionales() {
     const policyQuery = new GlobalPolicyExtractor(auth, customerId);
     const politicas = policyQuery.fetchTree();
     
+    // Obtener grupos del directorio para auditoría individual (vía DWD privilegiado)
+    let groupsList = [];
+    try {
+      const adminEmail = auth.getCurrentUserEmail();
+      const groupsHeader = auth.getPrivilegedAuthHeader(adminEmail, [
+        "https://www.googleapis.com/auth/admin.directory.group.readonly"
+      ]);
+      let groupPageToken = null;
+      do {
+        let groupsUrl = `https://admin.googleapis.com/admin/directory/v1/groups?customer=${encodeURIComponent(customerId)}&maxResults=200`;
+        if (groupPageToken) groupsUrl += `&pageToken=${encodeURIComponent(groupPageToken)}`;
+        const groupsResponse = UrlFetchApp.fetch(groupsUrl, {
+          method: "get",
+          headers: { ...groupsHeader, "Cache-Control": "no-cache" },
+          muteHttpExceptions: true
+        });
+        const groupsJson = JSON.parse(groupsResponse.getContentText());
+        if (groupsJson.groups) {
+          groupsList.push(...groupsJson.groups);
+        }
+        groupPageToken = groupsJson.nextPageToken || null;
+      } while (groupPageToken);
+      Logger.log(`[MAIN] Se cargaron ${groupsList.length} grupos del directorio vía DWD.`);
+    } catch (e) {
+      Logger.log("[WARN] Error al obtener grupos del directorio vía DWD: " + e.message);
+    }
+    
     const globalContext = {
       census: censo,
       policies: politicas,
-      auth: auth
+      auth: auth,
+      groups: groupsList
     };
     
     // Instanciamos el facade
@@ -522,3 +550,145 @@ function AuditoriaServiciosAdicionales() {
   }
 }
 
+/**
+ * Orquestador principal para la auditoría gestión de dispositivos (windows, etc.)
+ */
+function AuditoriaGestionDispositivos() {
+  const ui = SpreadsheetApp.getUi();
+  
+  try {
+    const auth = new AuthService();
+    
+    // Extracción de variables comunes que podríamos necesitar
+    const customerId = auth.getCustomerId();
+    // Obtener el email del usuario actual para pasarlo a estrategias que lo requieran (ej. AuditTokens)
+    const userEmail = auth.getCurrentUserEmail();
+
+    // 0. Inicializar contexto global en RAM (Censo de usuarios con roles y Políticas)
+    const censoWrapper = new CensusStateWrapper();
+    censoWrapper.buildAndStoreCensus(auth, customerId);
+    const censo = censoWrapper.getCensus();
+    // Inyectar diccionario OU ID → Path al motor CEL para resolución de OUs
+    CELParserEngine.ouIdToPathMap = censoWrapper.getOuMap();
+    
+    const policyQuery = new GlobalPolicyExtractor(auth, customerId);
+    const politicas = policyQuery.fetchTree();
+    
+    const globalContext = {
+      census: censo,
+      policies: politicas,
+      auth: auth
+    };
+    
+    // Instanciamos el facade
+    const auditor = new SecurityAuditorFacade(auth, globalContext);
+
+    // --- 1. DEFINICIÓN DE ESTRATEGIAS ---
+    // Aquí conectamos cada estrategia con su lógica de negocio.
+    const estrategias = [
+      new MobileDeviceApprovalStrategy(customerId),   // ID-141
+      new AndroidMobileSyncStrategy(customerId),      // ID-142
+      new IosMobileSyncStrategy(customerId),          // ID-143
+      new ActiveSyncMobileSyncStrategy(customerId),   // ID-144
+      new AppleDeviceEnrollmentStrategy(customerId),  // ID-146
+      new AppleAppsImapStrategy(customerId),          // ID-147
+      new BasicPasswordComplianceStrategy(customerId),// ID-148
+      new StrongPasswordComplianceStrategy(customerId),// ID-149
+      new DeviceWipePolicyStrategy(customerId),       // ID-150
+      new ManagedAppsDataSharingStrategy(customerId), // ID-156 
+      new UnmanagedAppsDataSharingStrategy(customerId)// ID-157
+
+    ];
+
+    // --- 2. REGISTRO DE ESTRATEGIAS ---
+    estrategias.forEach(estrategia => auditor.addStrategy(estrategia));
+
+    // Si no hay estrategias aún, avisamos y salimos para no ejecutar en vacío
+    if (estrategias.length === 0) {
+      ui.alert("El módulo de Google Drive está listo, pero aún no tiene métricas asignadas.");
+      return;
+    }
+
+    // --- 3. EJECUCIÓN ---
+    ui.showModelessDialog(HtmlService.createHtmlOutput("⏳ Procesando auditoría de Google Drive, puede tomar algunos segundos..."), "Estado");
+    
+    const resultados = auditor.ejecutarTodo();
+    
+    // --- 4. ESCRITURA EN SHEETS (Polimorfismo) ---
+    resultados.forEach(res => {
+      const estrategiaResponsable = estrategias.find(e => e.name === res.name);
+      
+      if (estrategiaResponsable && res) {
+        estrategiaResponsable.writeToSheet(res); 
+      }
+    });
+    
+    // --- 5. FINALIZACIÓN ---
+    generarResumenSemaforo();
+    ui.alert("✅ Auditoría de Google Drive completada con éxito.");
+
+  } catch (error) {
+    Logger.log("Error en auditoría de Google Drive: " + error.stack);
+    ui.alert("❌ Error: " + error.message);
+  }
+}
+
+/**
+ * Orquestador principal para la auditoría de Gestión de Navegadores (Chrome)
+ */
+function AuditoriaGestionNavegador() {
+  const ui = SpreadsheetApp.getUi();
+  
+  try {
+    const auth = new AuthService();
+    const customerId = auth.getCustomerId();
+    
+    // 0. Inicializar contexto global en RAM (Censo de usuarios con roles y Políticas)
+    const censoWrapper = new CensusStateWrapper();
+    censoWrapper.buildAndStoreCensus(auth, customerId);
+    const censo = censoWrapper.getCensus();
+    // Inyectar diccionario OU ID → Path al motor CEL para resolución de OUs
+    CELParserEngine.ouIdToPathMap = censoWrapper.getOuMap();
+    
+    const policyQuery = new GlobalPolicyExtractor(auth, customerId);
+    const politicas = policyQuery.fetchTree();
+    
+    const globalContext = {
+      census: censo,
+      policies: politicas,
+      auth: auth
+    };
+    
+    const auditor = new SecurityAuditorFacade(auth, globalContext);
+    // 1. Instanciamos las estrategias exclusivas de Gestión de Navegador
+    const estrategias = [
+      new ChromeCloudEnrollmentStrategy(customerId),
+      new ChromeMachinePolicyStrategy(customerId),
+      new ChromeBrowserSigninStrategy(customerId),
+      new ChromeEndpointVerificationStrategy(customerId),
+      new ChromePasswordManagerStrategy(customerId),
+      new ChromeCipherSuiteBlacklistStrategy(customerId),
+      new ChromeRendererCodeIntegrityStrategy(customerId),
+      new ChromeAdvancedProtectionStrategy(customerId),
+      new ChromeSafeBrowsingLevelStrategy(customerId),
+      new ChromeDownloadRestrictionsStrategy(customerId),
+      new ChromePasswordAlertStrategy(customerId),
+      new ChromeComponentUpdatesStrategy(customerId),
+      new ChromeUpdatePolicyOverrideStrategy(customerId),
+      new ChromePolicyPrecedenceStrategy(customerId),
+      new ChromeSyncSettingsCbcmStrategy(customerId)
+    ];
+    // 2. Agregamos las estrategias al auditor
+    estrategias.forEach(estrategia => auditor.addStrategy(estrategia));
+    ui.showModelessDialog(HtmlService.createHtmlOutput("⏳ Procesando auditoría de gestión de navegadores Chrome, puede tomar algunos segundos..."), "Estado");
+    
+    // 3. Ejecutamos las APIs
+    const resultados = auditor.ejecutarTodo();
+    
+    generarResumenSemaforo();
+    ui.alert("✅ Auditoría de gestión de navegadores Chrome completada con éxito.");
+  } catch (error) {
+    Logger.log("Error en auditoría de gestión de navegador: " + error.stack);
+    ui.alert("❌ Error: " + error.message);
+  }
+}

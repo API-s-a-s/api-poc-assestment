@@ -39,7 +39,7 @@ class GoogleTakeoutStatusStrategy extends ApiStrategy {
 
     // Filtramos las políticas pertenecientes a la directiva macro de Takeout
     let targetPolicies = policies.filter(p => 
-      p.setting && (p.setting.type || "").endsWith("takeout_status")
+      p.setting && (p.setting.type || "").endsWith("takeout.service_status")
     );
     
     Logger.log(`[ID-137] Se encontraron ${targetPolicies.length} políticas en memoria mediante filtro .endsWith()`);
@@ -61,7 +61,7 @@ class GoogleTakeoutStatusStrategy extends ApiStrategy {
           "https://www.googleapis.com/auth/cloud-identity.policies.readonly"
         ]);
 
-        const filter = `customer=="customers/${this.customerId}" && setting.type.matches(".*takeout_status.*")`;
+        const filter = `customer=="customers/${this.customerId}" && setting.type.matches(".*takeout.service_status.*")`;
         const url = `https://cloudidentity.googleapis.com/v1/policies?filter=${encodeURIComponent(filter)}&t=${new Date().getTime()}`;
 
         Logger.log(`[DEBUG ID-137] URL Generada para API: ${url}`);
@@ -106,7 +106,7 @@ class GoogleTakeoutStatusStrategy extends ApiStrategy {
     let rawData = null;
 
     if (targetPolicies.length > 0) {
-      const rootPolicy = PolicyReducerFactory.getEffectiveRootPolicy(targetPolicies, "takeout_status");
+      const rootPolicy = PolicyReducerFactory.getEffectiveRootPolicy(targetPolicies, "takeout.service_status");
       if (rootPolicy && rootPolicy.setting) {
         rawData = rootPolicy;
         
@@ -116,11 +116,15 @@ class GoogleTakeoutStatusStrategy extends ApiStrategy {
         const valueNode = rootPolicy.setting.value || rootPolicy.setting;
         Logger.log(`[DEBUG ID-137] Estructura interna de valueNode: ${JSON.stringify(valueNode)}`);
         
-        // Verificación resiliente del parámetro takeout_status (snake_case y camelCase)
+        // Verificación resiliente del parámetro takeout_status / serviceState (snake_case y camelCase)
         if (valueNode.takeout_status !== undefined) {
           extractedTakeoutStatus = valueNode.takeout_status;
         } else if (valueNode.takeoutStatus !== undefined) {
           extractedTakeoutStatus = valueNode.takeoutStatus;
+        } else if (valueNode.serviceState !== undefined) {
+          extractedTakeoutStatus = valueNode.serviceState;
+        } else if (valueNode.service_state !== undefined) {
+          extractedTakeoutStatus = valueNode.service_state;
         }
         
         Logger.log(`[DEBUG ID-137] Valor final de la variable extraído: ${extractedTakeoutStatus}`);

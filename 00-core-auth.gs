@@ -7,6 +7,7 @@ class AuthService {
   constructor() {
     this.cache = CacheService.getScriptCache();    
   }
+
   /**
    * Token interactivo estándar de Apps Script (Contexto de usuario ejecutor)
    */
@@ -94,12 +95,32 @@ class AuthService {
   /**
    * Genera u obtiene del caché un token firmado por Cuenta de Servicio
    * aplicando Delegación de Dominio Completo (DWD) para suplantar a un Súper Admin.
-   * * @param {string} adminEmail Correo electrónico del Súper Administrador a suplantar.
+   * @param {string} adminEmail Correo electrónico del Súper Administrador a suplantar.
    * @return {Object} Cabecera de autenticación estructurada para UrlFetchApp.
    */
-  getPrivilegedAuthHeader(adminEmail, scopes = ["https://www.googleapis.com/auth/cloud-identity.policies.readonly"]) {
+  // 👇👇👇 MODIFICACIÓN: INYECCIÓN DE SCOPES POR DEFECTO PARA DIRECTORIO 👇👇👇
+  // Se agregaron 'userschema' y 'user' a los parámetros por defecto de la función
+  getPrivilegedAuthHeader(
+    adminEmail, 
+    scopes = [
+      "https://www.googleapis.com/auth/cloud-identity.policies.readonly",
+      "https://www.googleapis.com/auth/admin.directory.user",
+      "https://www.googleapis.com/auth/admin.directory.userschema"
+    ]
+  ) {
+  // 👆👆👆 FIN DE LA MODIFICACIÓN 👆👆👆
+  
     // PASO 1: Clave estática determinista. Que destruía la utilidad de la caché y generaba saturación de tokens.
-    const cacheKey = "SA_TOKEN_DWD_" + adminEmail.replace(/[^a-zA-Z0-9]/g, "");
+    // MODIFICACIÓN: Incluimos un hash de los scopes para evitar colisiones de caché entre llamadas con alcances diferentes.
+    const scopesString = (scopes || []).slice().sort().join(",");
+    let hashVal = 0;
+    for (let i = 0; i < scopesString.length; i++) {
+      const char = scopesString.charCodeAt(i);
+      hashVal = ((hashVal << 5) - hashVal) + char;
+      hashVal |= 0; // Convertir a entero de 32 bits
+    }
+    const scopesHash = Math.abs(hashVal).toString(36);
+    const cacheKey = "SA_TOKEN_DWD_" + adminEmail.replace(/[^a-zA-Z0-9]/g, "") + "_" + scopesHash;
     let token = this.cache.get(cacheKey);
 
     if (token) {
@@ -118,9 +139,9 @@ class AuthService {
       aud: saCreds.token_uri || "https://oauth2.googleapis.com/token",
       exp: now + 3600, 
       iat: now
-    }
-  );
-const base64Header = Utilities.base64EncodeWebSafe(jwtHeader).replace(/=+$/, '');
+    });
+    
+    const base64Header = Utilities.base64EncodeWebSafe(jwtHeader).replace(/=+$/, '');
     const base64Claim = Utilities.base64EncodeWebSafe(jwtClaim).replace(/=+$/, '');
     const signatureInput = base64Header + "." + base64Claim;
 
@@ -161,14 +182,10 @@ const base64Header = Utilities.base64EncodeWebSafe(jwtHeader).replace(/=+$/, '')
 
   // =====================================================================
   // Resolución dinámica de roleId desde AdminDirectory.Roles.list()
-  // Se resuelve una sola vez y se cachea en CacheService por 25 minutos.
-  // Esto reemplaza los placeholders estáticos que nunca coincidían con
-  // los IDs numéricos reales que devuelve la API de Directory.
   // =====================================================================
   _resolveRoleMap() {
     if (this._roleMap) return this._roleMap;
 
-    // Intentar recuperar del caché efímero
     const cacheKey = "AUTH_ROLE_MAP";
     const cached = this.cache.get(cacheKey);
     if (cached) {
@@ -176,10 +193,9 @@ const base64Header = Utilities.base64EncodeWebSafe(jwtHeader).replace(/=+$/, '')
         this._roleMap = JSON.parse(cached);
         Logger.log(`[AUTH] Mapa de roles recuperado de caché: ${Object.keys(this._roleMap).length} roles`);
         return this._roleMap;
-      } catch (e) { /* caché corrupta, reconstruimos */ }
+      } catch (e) { }
     }
 
-    // Consulta a la API de Directory para construir el diccionario roleName → roleId
     Logger.log("[AUTH] Construyendo mapa dinámico de roleId desde AdminDirectory.Roles.list()...");
     const map = {};
     const customerId = this.getCustomerId();
@@ -190,7 +206,6 @@ const base64Header = Utilities.base64EncodeWebSafe(jwtHeader).replace(/=+$/, '')
         const response = AdminDirectory.Roles.list(customerId, { maxResults: 100, pageToken: pageToken });
         const roles = response.items || [];
         roles.forEach(role => {
-          // Usamos el roleName del sistema como clave (ej: "_SUPER_ADMIN_ROLE")
           map[role.roleName] = role.roleId;
           Logger.log(`[AUTH] Rol resuelto: ${role.roleName} → ${role.roleId}`);
         });
@@ -201,22 +216,15 @@ const base64Header = Utilities.base64EncodeWebSafe(jwtHeader).replace(/=+$/, '')
     }
 
     this._roleMap = map;
-    // Persistir en caché por 25 minutos (mismo TTL que el censo)
     this.cache.put(cacheKey, JSON.stringify(map), 1500);
     return this._roleMap;
   }
 
-  /**
-   * Busca el roleId numérico real para un nombre de rol del sistema.
-   * Si la resolución dinámica falla, devuelve el nombre del sistema como fallback
-   * (los scripts ya tienen fallback por roleName para este caso).
-   */
   _getRoleIdBySystemName(systemRoleName) {
     const map = this._resolveRoleMap();
     return map[systemRoleName] || systemRoleName;
   }
 
-  // Getters de roles — ahora devuelven IDs numéricos reales
   getSuperAdminRoleId()   { return this._getRoleIdBySystemName("_SUPER_ADMIN_ROLE"); }
   getGroupsAdminRoleId()  { return this._getRoleIdBySystemName("_GROUPS_ADMIN_ROLE"); }
   getUserAdminRoleId()    { return this._getRoleIdBySystemName("_USER_MANAGEMENT_ADMIN_ROLE"); }

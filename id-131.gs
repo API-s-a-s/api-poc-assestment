@@ -141,7 +141,7 @@ class SitesDriveExternalSharingStrategy extends ApiStrategy {
     if (extractedPublishing === true) {
       respuestaConcreta = `Publicación Permitida (${extractedSharingMode || "ON"})`;
       riesgo = "Alto";
-      commentario = "Debido a que Google Sites se gestiona de forma nativa en la infraestructura de Drive, permitir la publicación de archivos habilita que los sitios sean indizados por motores de búsqueda públicos sin requerir autenticación corporativa. Esto expone a la organización a que entidades maliciosas generen portales de phishing bajo un dominio de alta reputación.";
+      comentario = "Debido a que Google Sites se gestiona de forma nativa en la infraestructura de Drive, permitir la publicación de archivos habilita que los sitios sean indizados por motores de búsqueda públicos sin requerir autenticación corporativa. Esto expone a la organización a que entidades maliciosas generen portales de phishing bajo un dominio de alta reputación.";
     } else if (extractedSharingMode === "OFF") {
       respuestaConcreta = "Uso compartido externo desactivado";
       riesgo = "Bajo";
@@ -163,7 +163,7 @@ class SitesDriveExternalSharingStrategy extends ApiStrategy {
       name: this.name,
       raw: rawData,
       valorPrincipal: respuestaConcreta,
-      comentario131: commentario,
+      comentario131: comentario,
       riesgo131: riesgo,
       score131: this.calcularScoreDeRiesgo(riesgo)
     };

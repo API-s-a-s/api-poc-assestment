@@ -13,6 +13,8 @@ function onOpen() {
       .addItem('🧩 Ejecutar análisis de email y DNS', 'AuditoriasEmail')
       .addItem('🧩 Ejecutar análisis de Drive', 'AuditoriaDrive')
       .addItem('🧩 Ejecutar análisis de Servicios Adicionales', 'AuditoriaServiciosAdicionales')
+      .addItem('🧩 Ejecutar análisis de gestión de dispositivos', 'AuditoriaGestionDispositivos')
+      .addItem('🧩 Ejecutar análisis de gestión de navegadores', 'AuditoriaGestionNavegador')      
       .addSeparator()
       .addItem('🩺 Ejecutar indice de exposición de datos personal', 'AuditoriaIEDrivePersonal')
       .addItem('🩺 Ejecutar indice de exposición de datos global', 'AuditoriaIEDGlobal')

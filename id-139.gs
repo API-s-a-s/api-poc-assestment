@@ -133,6 +133,10 @@ class AdditionalServicesToSAuditStrategy extends ApiStrategy {
           extractedIsEnabled = valueNode.is_enabled;
         } else if (valueNode.isEnabled !== undefined) {
           extractedIsEnabled = valueNode.isEnabled;
+        } else if (valueNode.services && Array.isArray(valueNode.services)) {
+          // Si es un array de servicios (como api_controls.google_services), consideramos habilitado si alguno de los servicios críticos está habilitado
+          const activeServices = valueNode.services.filter(s => s.isEnabled !== false && s.is_enabled !== false);
+          extractedIsEnabled = activeServices.length > 0;
         }
         
         Logger.log(`[DEBUG ID-139] Valores extraídos finales -> Restricción: ${extractedRestriction} | Habilitado: ${extractedIsEnabled}`);
@@ -149,7 +153,7 @@ class AdditionalServicesToSAuditStrategy extends ApiStrategy {
     } else if (extractedRestriction === "ALLOW" || extractedRestriction === "UNRESTRICTED" || extractedIsEnabled === true) {
       respuestaConcreta = "Acceso Abierto (Permisivo)";
       riesgo = "Alto";
-      comentario = "Alerta de gobernanza de infraestructura legal. Se permite de forma irrestricta el acceso de los usuarios a servicios auxiliares y adicionales de consumo general de Google (YouTube, Blogger, herramientas de IA no empresariales). Estas plataformas eluden los Acuerdos de Nivel de Servicio (SLA) centrales del inquilino y exponen datos corporativos a enrutamientos fuera del cumplimiento corporativo.";
+      comentario = "Se permite de forma irrestricta el acceso de los usuarios a servicios auxiliares y adicionales de consumo general de Google (YouTube, Blogger, herramientas de IA no empresariales). Estas plataformas eluden los Acuerdos de Nivel de Servicio (SLA) centrales del inquilino y exponen datos corporativos a enrutamientos fuera del cumplimiento corporativo.";
     } else {
       // Comportamiento permisivo por defecto si Google no reporta políticas explícitas
       respuestaConcreta = "Acceso Abierto (Valor por defecto)";
