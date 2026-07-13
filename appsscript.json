@@ -51,7 +51,6 @@
     "https://www.googleapis.com/auth/admin.directory.orgunit.readonly",
     "https://www.googleapis.com/auth/admin.directory.device.mobile.readonly",
     "https://www.googleapis.com/auth/admin.directory.device.mobile.action",
-    "https://www.googleapis.com/auth/cloud-identity.devices.readonly",
     "https://www.googleapis.com/auth/chrome.management.policy.readonly"
     
   ],

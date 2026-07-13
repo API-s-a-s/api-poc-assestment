@@ -122,19 +122,21 @@ class MobileDeviceApprovalStrategy extends ApiStrategy {
 
     if (totalAnalizados === 0) {
       riesgo141 = "Bajo"; 
-      valorPrincipal = "No evaluable (0)";
+      valorPrincipal = "0";
       comentario141 = "No se encontraron dispositivos o usuarios de dispositivos en el tenant para evaluar el estado de cuarentena.";
     } else {
-      valorPrincipal = `Aprobados: ${approvedCount} | Pendientes: ${pendingCount}`;
+      
       
       if (pendingCount > 0) {
         // Si hay dispositivos pendientes, es la prueba de fuego de que la política SÍ está reteniendo hardware no confiable.
+        valorPrincipal = `Deshabilitado`;
         riesgo141 = "Bajo";
-        comentario141 = `Se detectaron ${pendingCount} dispositivos en estado 'PENDING_APPROVAL', lo que comprueba que la cuarentena (aprobación requerida por el administrador) está activa y funcionando.`;
+        comentario141 = `Se detectaron ${pendingCount} dispositivos en estado 'PENDING_APPROVAL', lo que comprueba que la cuarentena aprobación requerida por el administrador está activa y funcionando.`;
       } else {
         // Si todos están aprobados, podría estar activa, pero es un riesgo latente si la apagaron.
+        valorPrincipal = `${approvedCount} aprobados y ${pendingCount} pendientes`;
         riesgo141 = "Medio";
-        comentario141 = `Todos los dispositivos analizados (${approvedCount}) tienen estado 'APPROVED'. Se recomienda verificar en la consola de Admin si la política "Requerir aprobación del administrador" sigue activa para nuevas inscripciones.`;
+        comentario141 = `Se recomienda verificar en la consola de Admin. Todos los ${approvedCount} dispositivos analizados tienen estado 'APPROVED'.`;
       }
     }
 

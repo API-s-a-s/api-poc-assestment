@@ -121,17 +121,18 @@ class DeviceWipePolicyStrategy extends ApiStrategy {
     const totalAnalizados = wipedCount + wipingCount + otherCount;
 
     if (totalAnalizados === 0) {
-      valorPrincipal = "No evaluable (0)";
+      valorPrincipal = "Sin politicas de borrado";
+      riesgo150 ="";
       comentario150 = "No se encontraron dispositivos o usuarios de dispositivos en el tenant para evaluar trazabilidad de borrado remoto (Wipe).";
     } else {
-      valorPrincipal = `Wiped: ${wipedCount} | Wiping: ${wipingCount}`;
+      valorPrincipal = `${wipedCount} con borrado completo y ${wipingCount} en proceso`;
       
       if (wipedCount > 0 || wipingCount > 0) {
         // Se confirma operativamente que las acciones de borrado remoto funcionan y han sido usadas.
-        comentario150 = `Trazabilidad confirmada. Se detectaron ${wipedCount} dispositivos con borrado completado (WIPED) y ${wipingCount} en proceso (WIPING). Esto evidencia operativamente que las políticas de destrucción de datos y revocación de cuentas están activas y han sido ejecutadas exitosamente.`;
+        comentario150 = `Se detectaron ${wipedCount} dispositivos con borrado completo y ${wipingCount} en proceso. Esto hace que las políticas de destrucción de datos y revocación de cuentas están activas.`;
       } else {
         // No hay borrados recientes. Esto no es necesariamente malo, solo una métrica operativa.
-        comentario150 = `Los ${otherCount} dispositivos analizados mantienen estados regulares (ej. APPROVED). No se detectaron acciones de borrado remoto (Wipe) recientes en los registros de auditoría actuales.`;
+        comentario150 = `Los ${otherCount} dispositivos analizados mantienen estados regulares. No hay borrado remoto en los logs.`;
       }
     }
 
@@ -149,8 +150,8 @@ class DeviceWipePolicyStrategy extends ApiStrategy {
     return {
       name: this.name,
       valorPrincipal: "ERROR",
-      riesgo150: "Medio",
-      score150: 2,
+      riesgo150: "",
+      score150: 0,
       comentario150: msg
     };
   }

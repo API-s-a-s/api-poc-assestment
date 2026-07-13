@@ -527,7 +527,7 @@ function AuditoriaServiciosAdicionales() {
     }
 
     // --- 3. EJECUCIÓN ---
-    ui.showModelessDialog(HtmlService.createHtmlOutput("⏳ Procesando auditoría de Servicios Adicionales, puede tomar algunos segundos..."), "Estado");
+    ui.showModelessDialog(HtmlService.createHtmlOutput("⏳ Procesando auditoría de servicios adicionales, puede tomar algunos segundos..."), "Estado");
     
     const resultados = auditor.ejecutarTodo();
     
@@ -595,6 +595,9 @@ function AuditoriaGestionDispositivos() {
       new BasicPasswordComplianceStrategy(customerId),// ID-148
       new StrongPasswordComplianceStrategy(customerId),// ID-149
       new DeviceWipePolicyStrategy(customerId),       // ID-150
+      new ManagedIosAppsStrategy(customerId),
+      new ManagedAndroidAppsStrategy(customerId),
+      new AndroidWorkProfileStrategy(customerId),      // ID-153
       new ManagedAppsDataSharingStrategy(customerId), // ID-156 
       new UnmanagedAppsDataSharingStrategy(customerId)// ID-157
 
@@ -610,7 +613,7 @@ function AuditoriaGestionDispositivos() {
     }
 
     // --- 3. EJECUCIÓN ---
-    ui.showModelessDialog(HtmlService.createHtmlOutput("⏳ Procesando auditoría de Google Drive, puede tomar algunos segundos..."), "Estado");
+    ui.showModelessDialog(HtmlService.createHtmlOutput("⏳ Procesando auditoría de gestión de dispositivos, puede tomar algunos segundos..."), "Estado");
     
     const resultados = auditor.ejecutarTodo();
     
@@ -625,7 +628,7 @@ function AuditoriaGestionDispositivos() {
     
     // --- 5. FINALIZACIÓN ---
     generarResumenSemaforo();
-    ui.alert("✅ Auditoría de Google Drive completada con éxito.");
+    ui.alert("✅ Auditoría de Google gestión de dispositivos completada con éxito.");
 
   } catch (error) {
     Logger.log("Error en auditoría de Google Drive: " + error.stack);
@@ -690,5 +693,27 @@ function AuditoriaGestionNavegador() {
   } catch (error) {
     Logger.log("Error en auditoría de gestión de navegador: " + error.stack);
     ui.alert("❌ Error: " + error.message);
+  }
+}
+
+/**
+ * Función dedicada únicamente a ejecutar las pruebas exploratorias 
+ * editor de Apps Script o un botón en Sheets independiente.
+ */
+function ProbarApis() {
+  const ui = SpreadsheetApp.getUi();
+  ui.showModelessDialog(
+    HtmlService.createHtmlOutput("⏳ Ejecutando pruebas exploratorias de. Revisa los logs en unos momentos."), 
+    "Ejecutando pruebas de Chrome"
+  );
+  
+  try {
+    // const tester = new ChromeApiTester();
+    const tester = new DeviceApiTester();
+    tester.runAllTests();
+    ui.alert("✅ Pruebas de APIs de Chrome completadas. Por favor, abre 'Ver -> Registro de ejecución' para examinar los resultados detallados.");
+  } catch (error) {
+    Logger.log("Error crítico en la ejecución de pruebas de Chrome: " + error.stack);
+    ui.alert("❌ Error crítico: " + error.message);
   }
 }

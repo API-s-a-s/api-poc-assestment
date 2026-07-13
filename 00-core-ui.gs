@@ -17,7 +17,7 @@ function onOpen() {
       .addItem('🧩 Ejecutar análisis de gestión de navegadores', 'AuditoriaGestionNavegador')      
       .addSeparator()
       .addItem('🩺 Ejecutar indice de exposición de datos personal', 'AuditoriaIEDrivePersonal')
-      .addItem('🩺 Ejecutar indice de exposición de datos global', 'AuditoriaIEDGlobal')
+      .addItem('🩺 Ejecutar indice de exposición de datos global', 'ProbarApis')
       .addSeparator()
       .addItem('ℹ️ Ayuda y Soporte', 'mostrarAyuda')
       .addToUi();

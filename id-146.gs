@@ -118,10 +118,10 @@ class AppleDeviceEnrollmentStrategy extends ApiStrategy {
 
     if (totalDevices === 0) {
       riesgo146 = "Medio"; 
-      valorPrincipal = "No evaluable (0)";
-      comentario146 = "No se encontraron dispositivos registrados en Cloud Identity. No es posible verificar la integración con Apple Business Manager (ABM) o Device Enrollment Program (DEP).";
+      valorPrincipal = "Sin dispositivos";
+      comentario146 = "No se encontraron dispositivos registrados y no es posible verificar la integración con Apple Business Manager (ABM) o Device Enrollment Program (DEP).";
     } else {
-      valorPrincipal = `Corp: ${companyOwnedCount} | BYOD: ${byodCount}`;
+      valorPrincipal = `${companyOwnedCount} corporativos y ${byodCount} personales:`;
       
       if (companyOwnedCount > 0) {
         // Existen dispositivos propiedad de la empresa (COMPANY_OWNED), lo que implica sincronización de inventario.

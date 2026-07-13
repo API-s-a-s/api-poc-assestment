@@ -32,43 +32,90 @@ class BasicPasswordComplianceStrategy extends ApiStrategy {
   }
 
   evaluateInMemory(globalContext) {
-    const { policies } = globalContext;
-    if (!policies) {
-      return this._buildErrorResponse("Falta el contexto global (políticas no encontradas en memoria).");
+    const { auth } = globalContext;
+    if (!auth) {
+      return this._buildErrorResponse("Falta el contexto global (objeto auth no encontrado).");
     }
 
-    Logger.log("========== INICIO DIAGNÓSTICO ID-148 (BASIC PASSWORD COMPLIANCE) ==========");
+    Logger.log("========== INICIO DIAGNÓSTICO ID-148 (BASIC PASSWORD COMPLIANCE VIA DEVICES) ==========");
 
-    let enforceAtLogin = false;
-    let policyFound = false;
+    let deviceNames = [];
+    let passwordSetCount = 0;
+    let passwordNotSetCount = 0;
+    let otherCount = 0;
 
     try {
-      Logger.log(`[ID-148 DEBUG] Total de políticas en globalContext: ${policies.length}`);
-      
-      // Utilizamos el Reducer para obtener la política efectiva en la raíz para este setting
-      const pwdPolicy = PolicyReducerFactory.getEffectiveRootPolicy(policies, "settings/security.password");
-      
-      if (pwdPolicy) {
-        Logger.log(`[ID-148 DEBUG] Objeto completo devuelto por el Reducer: ${JSON.stringify(pwdPolicy)}`);
+      // 1. Generar token DWD con el scope de Cloud Identity Devices
+      const adminEmail = auth.getCurrentUserEmail();
+      const dwdHeader = auth.getPrivilegedAuthHeader(adminEmail, [
+        "https://www.googleapis.com/auth/cloud-identity.devices.readonly"
+      ]);
+
+      // =====================================================================
+      // CAPA 1: Listar dispositivos raíz
+      // =====================================================================
+      let pageToken = "";
+      let pagesProcessed = 0;
+      do {
+        let url = `https://cloudidentity.googleapis.com/v1/devices?customer=customers/${this.customerId}&pageSize=100`;
+        if (pageToken) url += `&pageToken=${pageToken}`;
+
+        const response = UrlFetchApp.fetch(url, {
+          method: "get",
+          headers: dwdHeader,
+          muteHttpExceptions: true
+        });
+
+        if (response.getResponseCode() === 200) {
+          const json = JSON.parse(response.getContentText());
+          const devices = json.devices || [];
+          devices.forEach(d => {
+            if (d.name) deviceNames.push(d.name);
+          });
+          pageToken = json.nextPageToken;
+        } else {
+          Logger.log(`[ID-148] Error al consultar Devices API: HTTP ${response.getResponseCode()} - ${response.getContentText()}`);
+          break;
+        }
+        pagesProcessed++;
+        if (pagesProcessed >= 5) break;
+      } while (pageToken && deviceNames.length < 100);
+
+      Logger.log(`[ID-148] Dispositivos extraídos: ${deviceNames.length}. Consultando sub-recurso /deviceUsers...`);
+
+      // =====================================================================
+      // CAPA 2: Analizar passwordState en los usuarios del dispositivo
+      // =====================================================================
+      for (const deviceName of deviceNames) {
+        const usersUrl = `https://cloudidentity.googleapis.com/v1/${deviceName}/deviceUsers`;
+        const usersResponse = UrlFetchApp.fetch(usersUrl, {
+          method: "get",
+          headers: dwdHeader,
+          muteHttpExceptions: true
+        });
+
+        if (usersResponse.getResponseCode() === 200) {
+          const deviceUsers = JSON.parse(usersResponse.getContentText()).deviceUsers || [];
+          
+          deviceUsers.forEach(du => {
+            const state = du.passwordState || "PASSWORD_STATE_UNSPECIFIED";
+            if (state === "PASSWORD_SET") {
+              passwordSetCount++;
+            } else if (state === "PASSWORD_NOT_SET") {
+              passwordNotSetCount++;
+            } else {
+              otherCount++;
+            }
+          });
+        }
       }
-      
-      if (pwdPolicy && pwdPolicy.setting) {
-        policyFound = true;
-        
-        let valueNode = pwdPolicy.setting.value || pwdPolicy.setting;
-        
-        enforceAtLogin = valueNode.enforceRequirementsAtLogin === true;
-        
-        Logger.log(`[ID-148] Política de contraseñas encontrada. enforceRequirementsAtLogin: ${enforceAtLogin}`);
-        Logger.log(`[ID-148 RAW LOG] Nodo de valor extraído: ${JSON.stringify(valueNode)}`);
-      } else {
-        Logger.log("[ID-148] No se encontró política explícita para settings/security.password en la raíz.");
-      }
+
     } catch (e) {
-      Logger.log(`[ID-148] Excepción capturada al evaluar políticas: ${e.message}`);
-      return this._buildErrorResponse(`Error al procesar la política de contraseñas: ${e.message}`);
+      Logger.log(`[ID-148] Excepción capturada al consultar la API de Devices: ${e.message}`);
+      return this._buildErrorResponse(`Error al consultar la API de Devices: ${e.message}`);
     }
 
+    Logger.log(`[ID-148] Totales -> PASSWORD_SET: ${passwordSetCount} | PASSWORD_NOT_SET: ${passwordNotSetCount} | Otros: ${otherCount}`);
     Logger.log("========== FIN DIAGNÓSTICO ID-148 ==========");
 
     // =====================================================================
@@ -76,15 +123,24 @@ class BasicPasswordComplianceStrategy extends ApiStrategy {
     // =====================================================================
     let riesgo148 = "Bajo";
     let comentario148 = "";
-    
-    let valorPrincipal = enforceAtLogin ? "Requerido en Login" : "No Requerido";
+    let valorPrincipal = "";
 
-    if (enforceAtLogin) {
-      riesgo148 = "Bajo";
-      comentario148 = "Postura segura. La política exige que el dispositivo móvil tenga configurado al menos un PIN, patrón o contraseña de bloqueo de pantalla básica antes de permitir la sincronización de cualquier dato corporativo.";
-    } else {
+    const totalAnalizados = passwordSetCount + passwordNotSetCount + otherCount;
+
+    if (totalAnalizados === 0) {
+      valorPrincipal = "Deshabilitado";
       riesgo148 = "Medio";
-      comentario148 = "ATENCIÓN: No se requiere el cumplimiento de contraseñas al iniciar sesión (enforceRequirementsAtLogin es falso o no está configurado). Los dispositivos podrían sincronizar correos y archivos corporativos incluso sin tener un bloqueo de pantalla activo, exponiendo los datos en caso de robo o pérdida del hardware.";
+      comentario148 = "No se detectaron dispositivos activos con perfiles de usuario en el inventario para verificar la presencia de contraseña.";
+    } else {
+      if (passwordNotSetCount > 0) {
+        valorPrincipal = "Deshabilitado";
+        riesgo148 = "Alto";
+        comentario148 = `Riesgo detectado. Se encontraron ${passwordNotSetCount} dispositivo(s) sin contraseña de bloqueo configurada (PASSWORD_NOT_SET), lo que expone la data corporativa.`;
+      } else {
+        valorPrincipal = "Habilitado";
+        riesgo148 = "Bajo";
+        comentario148 = `Postura segura. Se auditó la API de dispositivos y todos los dispositivos activos analizados (${passwordSetCount}) tienen una contraseña configurada (PASSWORD_SET), cumpliendo con el requisito básico de bloqueo de pantalla.`;
+      }
     }
 
     return {

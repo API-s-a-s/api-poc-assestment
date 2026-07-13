@@ -32,59 +32,115 @@ class StrongPasswordComplianceStrategy extends ApiStrategy {
   }
 
   evaluateInMemory(globalContext) {
-    const { policies } = globalContext;
-    if (!policies) {
-      return this._buildErrorResponse("Falta el contexto global (políticas no encontradas en memoria).");
+    const { auth } = globalContext;
+    if (!auth) {
+      return this._buildErrorResponse("Falta el contexto global (objeto auth no encontrado).");
     }
 
-    Logger.log("========== INICIO DIAGNÓSTICO ID-149 (STRONG PASSWORD COMPLIANCE) ==========");
+    Logger.log("========== INICIO DIAGNÓSTICO ID-149 (STRONG PASSWORD COMPLIANCE VIA DEVICES) ==========");
 
-    let allowedStrength = "UNKNOWN";
-    let policyFound = false;
+    let deviceNames = [];
+    const stateCounts = {};
 
     try {
-      Logger.log(`[ID-149 DEBUG] Total de políticas en globalContext: ${policies.length}`);
-      
-      // Utilizamos el Reducer para obtener la política efectiva en la raíz para este setting
-      const pwdPolicy = PolicyReducerFactory.getEffectiveRootPolicy(policies, "settings/security.password");
-      
-      if (pwdPolicy) {
-        Logger.log(`[ID-149 DEBUG] Objeto completo devuelto por el Reducer: ${JSON.stringify(pwdPolicy)}`);
+      // 1. Generar token DWD con el scope de Cloud Identity Devices
+      const adminEmail = auth.getCurrentUserEmail();
+      const dwdHeader = auth.getPrivilegedAuthHeader(adminEmail, [
+        "https://www.googleapis.com/auth/cloud-identity.devices.readonly"
+      ]);
+
+      // =====================================================================
+      // CAPA 1: Listar dispositivos raíz
+      // =====================================================================
+      let pageToken = "";
+      let pagesProcessed = 0;
+      do {
+        let url = `https://cloudidentity.googleapis.com/v1/devices?customer=customers/${this.customerId}&pageSize=100`;
+        if (pageToken) url += `&pageToken=${pageToken}`;
+
+        const response = UrlFetchApp.fetch(url, {
+          method: "get",
+          headers: dwdHeader,
+          muteHttpExceptions: true
+        });
+
+        if (response.getResponseCode() === 200) {
+          const json = JSON.parse(response.getContentText());
+          const devices = json.devices || [];
+          devices.forEach(d => {
+            if (d.name) deviceNames.push(d.name);
+          });
+          pageToken = json.nextPageToken;
+        } else {
+          Logger.log(`[ID-149] Error al consultar Devices API: HTTP ${response.getResponseCode()} - ${response.getContentText()}`);
+          break;
+        }
+        pagesProcessed++;
+        if (pagesProcessed >= 5) break;
+      } while (pageToken && deviceNames.length < 100);
+
+      Logger.log(`[ID-149] Dispositivos extraídos: ${deviceNames.length}. Consultando sub-recurso /deviceUsers...`);
+
+      // =====================================================================
+      // CAPA 2: Analizar passwordState en los usuarios del dispositivo
+      // =====================================================================
+      for (const deviceName of deviceNames) {
+        const usersUrl = `https://cloudidentity.googleapis.com/v1/${deviceName}/deviceUsers`;
+        const usersResponse = UrlFetchApp.fetch(usersUrl, {
+          method: "get",
+          headers: dwdHeader,
+          muteHttpExceptions: true
+        });
+
+        if (usersResponse.getResponseCode() === 200) {
+          const deviceUsers = JSON.parse(usersResponse.getContentText()).deviceUsers || [];
+          
+          deviceUsers.forEach(du => {
+            const state = du.passwordState || "PASSWORD_STATE_UNSPECIFIED";
+            stateCounts[state] = (stateCounts[state] || 0) + 1;
+          });
+        }
       }
-      
-      if (pwdPolicy && pwdPolicy.setting) {
-        policyFound = true;
-        
-        let valueNode = pwdPolicy.setting.value || pwdPolicy.setting;
-        
-        allowedStrength = valueNode.allowedStrength || "UNSPECIFIED";
-        
-        Logger.log(`[ID-149] Política de contraseñas encontrada. allowedStrength: ${allowedStrength}`);
-        Logger.log(`[ID-149 RAW LOG] Nodo de valor extraído: ${JSON.stringify(valueNode)}`);
-      } else {
-        Logger.log("[ID-149] No se encontró política explícita para settings/security.password en la raíz.");
-      }
+
     } catch (e) {
-      Logger.log(`[ID-149] Excepción capturada al evaluar políticas: ${e.message}`);
-      return this._buildErrorResponse(`Error al procesar la política de contraseñas: ${e.message}`);
+      Logger.log(`[ID-149] Excepción capturada al consultar la API de Devices: ${e.message}`);
+      return this._buildErrorResponse(`Error al consultar la API de Devices: ${e.message}`);
     }
 
+    Logger.log(`[ID-149] Conteos de estados de contraseña: ${JSON.stringify(stateCounts)}`);
     Logger.log("========== FIN DIAGNÓSTICO ID-149 ==========");
 
     // =====================================================================
     // LÓGICA DE SALIDA Y RIESGO
     // =====================================================================
-    let riesgo149 = "Bajo";
+    let riesgo149 = "Alto";
     let comentario149 = "";
-    
-    let valorPrincipal = allowedStrength;
+    let valorPrincipal = "No Configurado";
 
-    if (allowedStrength === "STRONG") {
-      riesgo149 = "Bajo";
-      comentario149 = "Excelente postura. La política exige restricciones complejas de criptografía local en el dispositivo (allowedStrength='STRONG'), obligando a los usuarios a configurar contraseñas fuertes que dificultan ataques de fuerza bruta si el hardware es comprometido.";
+    // Encontrar la configuración/estado de contraseña que más se repite (moda)
+    let mostFrequentState = null;
+    let maxCount = -1;
+
+    for (const state in stateCounts) {
+      if (stateCounts[state] > maxCount) {
+        maxCount = stateCounts[state];
+        mostFrequentState = state;
+      }
+    }
+
+    if (mostFrequentState) {
+      valorPrincipal = mostFrequentState;
+      if (mostFrequentState === "PASSWORD_SET") {
+        riesgo149 = "Bajo";
+        comentario149 = `El estado de contraseña más común en los dispositivos analizados es '${mostFrequentState}' con ${maxCount} ocurrencias.`;
+      } else {
+        riesgo149 = "Alto";
+        comentario149 = `El estado de contraseña predominante en los dispositivos analizados es '${mostFrequentState}' con ${maxCount} ocurrencias, por lo que los usuarios no tienen una contraseña en sus dispositivos.`;
+      }
     } else {
-      riesgo149 = "Alto";
-      comentario149 = `El nivel de seguridad de contraseña permitido actual es '${allowedStrength}'. No se están exigiendo contraseñas fuertes (STRONG). Esto permite a los usuarios configurar pines débiles o contraseñas simples, dejando los datos corporativos del dispositivo vulnerables en caso de pérdida o robo.`;
+      valorPrincipal = "Sin dispositivos";
+      riesgo149 = "";
+      comentario149 = "No se encontraron dispositivos en el inventario para auditar la configuración de cumplimiento de contraseñas.";
     }
 
     return {

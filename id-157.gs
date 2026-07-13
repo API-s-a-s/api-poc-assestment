@@ -45,8 +45,10 @@ class UnmanagedAppsDataSharingStrategy extends ApiStrategy {
     try {
       Logger.log(`[ID-157 DEBUG] Total de políticas en globalContext: ${policies.length}`);
       
+      const sharingPolicies = policies.filter(p => p.setting && (p.setting.type || "").endsWith("drive_and_docs.external_sharing"));
+      
       // Utilizamos el Reducer para obtener la política efectiva en la raíz para este setting
-      const sharingPolicy = PolicyReducerFactory.getEffectiveRootPolicy(policies, "settings/drive_and_docs.external_sharing");
+      const sharingPolicy = PolicyReducerFactory.getEffectiveRootPolicy(sharingPolicies, "drive_and_docs.external_sharing");
       
       if (sharingPolicy) {
         Logger.log(`[ID-157 DEBUG] Objeto completo devuelto por el Reducer: ${JSON.stringify(sharingPolicy)}`);
@@ -82,10 +84,10 @@ class UnmanagedAppsDataSharingStrategy extends ApiStrategy {
 
     if (externalSharingMode === "ALLOWED") {
       riesgo157 = "Alto";
-      comentario157 = "ALERTA CRÍTICA: El intercambio de datos está configurado como 'ALLOWED'. Esto permite que los datos corporativos fluyan hacia el espacio personal del usuario (ej. abrir un documento corporativo en una aplicación no administrada en iOS), lo que representa un riesgo crítico de fuga o exfiltración de información institucional.";
+      comentario157 = "El intercambio de datos está configurado como 'ALLOWED'. Esto permite que los datos corporativos fluyan hacia el espacio personal del usuario, lo que representa un riesgo crítico de fuga o exfiltración de información institucional.";
     } else {
       riesgo157 = "Bajo";
-      comentario157 = `Excelente postura. El intercambio de datos se encuentra restringido (${externalSharingMode}). Las restricciones nativas aseguran que el contenido descargado solo pueda abrirse en otras aplicaciones aprobadas por la empresa, aislando la data corporativa del espacio personal.`;
+      comentario157 = `El intercambio de datos se encuentra restringido (${externalSharingMode}). Las restricciones nativas aseguran que el contenido descargado solo pueda abrirse en otras aplicaciones aprobadas por la empresa.`;
     }
 
     return {

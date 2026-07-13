@@ -100,8 +100,8 @@ class IosMobileSyncStrategy extends ApiStrategy {
     let valorPrincipal = "";
 
     if (iosCount === 0) {
-      valorPrincipal = "No evaluable (0)";
-      comentario143 = "No se detectaron dispositivos con sistema operativo iOS (iPhone/iPad) en la muestra analizada del directorio. No es posible auditar si la política de sincronización está activa o bloqueada.";
+      valorPrincipal = "Sin dispositivos";
+      comentario143 = "No se detectaron dispositivos iOS en el directorio. No es posible auditar si la política de sincronización está activa o bloqueada.";
     } else {
       valorPrincipal = `${syncingCount} dispositivos sincronizando`;
       

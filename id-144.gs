@@ -98,9 +98,9 @@ class ActiveSyncMobileSyncStrategy extends ApiStrategy {
     let valorPrincipal = "";
 
     if (activeSyncCount === 0) {
-      valorPrincipal = "Ninguno (0)";
+      valorPrincipal = "Sin dispositivos";
       riesgo144 = "Bajo";
-      comentario144 = "Excelente postura. No se detectaron conexiones heredadas a través de Google Sync (ActiveSync). Esto asegura que los clientes de correo utilicen protocolos modernos de autenticación (OAuth).";
+      comentario144 = "No se detectaron dispositivos android en el directorio. No es posible auditar si la política de sincronización está activa o bloqueada.";
     } else {
       valorPrincipal = `${syncingCount} dispositivos activos`;
       

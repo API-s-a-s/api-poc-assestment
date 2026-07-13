@@ -102,19 +102,19 @@ class AndroidMobileSyncStrategy extends ApiStrategy {
     let valorPrincipal = "";
 
     if (androidCount === 0) {
-      valorPrincipal = "No evaluable (0)";
-      comentario142 = "No se detectaron dispositivos con sistema operativo Android en la muestra analizada del directorio. No es posible auditar si la política de sincronización está activa o bloqueada.";
+      valorPrincipal = "Sin dispositivos";
+      comentario142 = "No se detectaron dispositivos android en el directorio. No es posible auditar si la política de sincronización está activa o bloqueada.";
     } else {
       valorPrincipal = `${syncingCount} dispositivos sincronizando`;
       
       if (syncingCount > 0) {
         // La política permite el Sync y vemos evidencia de ello
         const fechaFormateada = Utilities.formatDate(lastSyncDate, "America/Bogota", "yyyy-MM-dd HH:mm:ss");
-        comentario142 = `Se detectaron ${androidCount} dispositivos Android, de los cuales ${syncingCount} reportan actividad de sincronización (lastSyncTime). La última sincronización detectada fue el ${fechaFormateada}. Esto confirma que el backend de Google permite peticiones de clientes Android.`;
+        comentario142 = `Se detectaron ${androidCount} dispositivos android, de los cuales ${syncingCount} reportan actividad de sincronización que fue el ${fechaFormateada}.`;
       } else {
         // Hay dispositivos pero ninguno sincroniza. Puede ser que la política lo esté bloqueando o hardware inactivo.
         riesgo142 = "Medio";
-        comentario142 = `ATENCIÓN: Se detectaron ${androidCount} dispositivos Android en el directorio, pero NINGUNO reporta fecha de sincronización (lastSyncTime nulo). Podría indicar que la política de acceso de datos (Sync) está deshabilitada para Android o el hardware está obsoleto.`;
+        comentario142 = `Se detectaron ${androidCount} dispositivos android en el directorio, pero NO reportan fecha de sincronización.`;
       }
     }
 

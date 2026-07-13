@@ -41,12 +41,16 @@ class AppleAppsImapStrategy extends ApiStrategy {
 
     let enableImapAccess = false;
     let policyFound = false;
+    let rawData = null;
 
     try {
       Logger.log(`[ID-147 DEBUG] Total de políticas en globalContext: ${policies.length}`);
       
+      // Filtramos buscando el endpoint de acceso IMAP de Gmail
+      const imapPolicies = policies.filter(p => p.setting && (p.setting.type || "").endsWith("gmail.imap_access"));
+      
       // Utilizamos el Reducer para obtener la política efectiva en la raíz para este setting
-      const imapPolicy = PolicyReducerFactory.getEffectiveRootPolicy(policies, "settings/gmail.imap_access");
+      const imapPolicy = PolicyReducerFactory.getEffectiveRootPolicy(imapPolicies, "gmail.imap_access");
       
       if (imapPolicy) {
         Logger.log(`[ID-147 DEBUG] Objeto completo devuelto por el Reducer: ${JSON.stringify(imapPolicy)}`);
@@ -54,14 +58,19 @@ class AppleAppsImapStrategy extends ApiStrategy {
       
       if (imapPolicy && imapPolicy.setting) {
         policyFound = true;
+        rawData = imapPolicy;
         
-        // Determinar de dónde sacar el valor: de .setting o de .setting.value
-        let valueNode = imapPolicy.setting.value || imapPolicy.setting;
+        // Determinar de dónde sacar el valor de configuración según el formato del API
+        const setting = imapPolicy.setting;
+        const imapNode = setting.gmailImapAccess || setting.imapAccess || setting.value || setting;
         
-        enableImapAccess = valueNode.enableImapAccess === true;
+        if (imapNode.enableImapAccess === true || imapNode.enable_imap_access === true || 
+            (imapNode.state && imapNode.state.toUpperCase() === 'ENABLED')) {
+          enableImapAccess = true;
+        }
         
         Logger.log(`[ID-147] Política encontrada. enableImapAccess: ${enableImapAccess}`);
-        Logger.log(`[ID-147 RAW LOG] Nodo de valor extraído: ${JSON.stringify(valueNode)}`);
+        Logger.log(`[ID-147 RAW LOG] Nodo de valor extraído: ${JSON.stringify(imapNode)}`);
       } else {
         Logger.log("[ID-147] No se encontró política explícita para settings/gmail.imap_access en la raíz.");
       }
@@ -84,14 +93,15 @@ class AppleAppsImapStrategy extends ApiStrategy {
 
     if (enableImapAccess) {
       riesgo147 = "Alto";
-      comentario147 = "ALERTA: El acceso a través del protocolo IMAP está habilitado. Esto permite que los usuarios configuren buzones corporativos en las aplicaciones nativas de Apple (Mail de iOS/macOS) mediante un protocolo legacy, lo cual genera un alto riesgo de eludir controles modernos de inicio de sesión (MFA/Context-Aware) y rompe la capacidad del MDM corporativo para gestionar esos datos.";
+      comentario147 = "El acceso a través del protocolo IMAP está habilitado. Esto permite que los usuarios configuren buzones corporativos en las aplicaciones nativas de Apple mediante un protocolo legacy, lo que perimite eludir controles modernos de inicio de sesión.";
     } else {
       riesgo147 = "Bajo";
-      comentario147 = "Excelente postura de seguridad. El acceso IMAP está deshabilitado. Esto obliga a los usuarios de iOS/iPadOS a utilizar aplicaciones modernas (como la app oficial de Gmail) que soportan autenticación robusta y pueden ser puestas en contenedores administrados (MDM).";
+      comentario147 = "El acceso IMAP está deshabilitado. Esto obliga a los usuarios de iOS/iPadOS a utilizar la app oficial de Gmail que soportan autenticación robusta.";
     }
 
     return {
       name: this.name,
+      raw: rawData,
       valorPrincipal: valorPrincipal,
       comentario147: comentario147,
       riesgo147: riesgo147,

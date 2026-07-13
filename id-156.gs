@@ -45,8 +45,10 @@ class ManagedAppsDataSharingStrategy extends ApiStrategy {
     try {
       Logger.log(`[ID-156 DEBUG] Total de políticas en globalContext: ${policies.length}`);
       
+      const sharingPolicies = policies.filter(p => p.setting && (p.setting.type || "").endsWith("drive_and_docs.external_sharing"));
+      
       // Utilizamos el Reducer para obtener la política efectiva en la raíz
-      const sharingPolicy = PolicyReducerFactory.getEffectiveRootPolicy(policies, "settings/drive_and_docs.external_sharing");
+      const sharingPolicy = PolicyReducerFactory.getEffectiveRootPolicy(sharingPolicies, "drive_and_docs.external_sharing");
       
       if (sharingPolicy) {
         Logger.log(`[ID-156 DEBUG] Objeto completo devuelto por el Reducer: ${JSON.stringify(sharingPolicy)}`);
@@ -81,8 +83,9 @@ class ManagedAppsDataSharingStrategy extends ApiStrategy {
     let valorPrincipal = externalSharingMode;
 
     if (externalSharingMode === "ALLOWED") {
+      valorPrincipal = "Permitido"
       riesgo156 = "Alto";
-      comentario156 = "ALERTA: El modo de compartición externa es 'ALLOWED'. Esto rompe el contenedor de intercambio administrado, ya que no se está restringiendo el destino de los archivos. Los documentos corporativos pueden ser abiertos tanto en aplicaciones administradas como personales.";
+      comentario156 = "El modo de compartición externa es 'ALLOWED'. Los documentos corporativos pueden ser abiertos tanto en aplicaciones administradas como personales.";
     } else {
       riesgo156 = "Bajo";
       comentario156 = `Intercambio administrado activo (${externalSharingMode}). Las políticas están utilizando las restricciones nativas del sistema operativo para asegurar que el contenido corporativo descargado solo pueda abrirse en otras aplicaciones aprobadas y gestionadas por la empresa.`;
