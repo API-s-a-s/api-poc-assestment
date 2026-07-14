@@ -148,8 +148,8 @@ class ChromeAdvancedProtectionStrategy extends ApiStrategy {
     } else {
       // anyFound === false o advancedProtectionAllowed === null (No configurado)
       riesgo166 = "Medio";
-      valorPrincipal = "No Configurado (Permitido por defecto)";
-      comentario166 = "La directiva no está configurada de manera explícita en la raíz del dominio. Si bien de forma nativa Chrome no bloquea las solicitudes que se originan de cuentas inscritas en Protección Avanzada, la falta de una política restrictiva formal no garantiza el cumplimiento uniforme de esta directiva de endurecimiento en el parque de dispositivos.";
+      valorPrincipal = "Sin Configurar (Hereda por defecto)";
+      comentario166 = "La Chrome Policy API respondió exitosamente sin encontrar una configuración explícita en la OU raíz para la Protección Avanzada. Si bien de forma nativa Chrome no bloquea estas cuentas, la falta de una política formal no garantiza el cumplimiento uniforme de esta directiva de endurecimiento en todos los dispositivos.";
     }
 
     Logger.log(`[ID-166] Diagnóstico Terminado. Valor Detectado: ${advancedProtectionAllowed} | Riesgo Asignado: ${riesgo166}`);

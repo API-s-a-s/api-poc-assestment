@@ -132,7 +132,15 @@ class ChromeApiTester {
 
         Logger.log(`[TEST] Resolviendo políticas para filtro '${filter}'...`);
 
-        this.executeApiCall("POST", url, authHeader, payload, (json) => {
+          this.executeApiCall("POST", url, authHeader, payload, (json) => {          
+          // =========================================================
+          // 💡 NUEVO: IMPRIMIR LA ESTRUCTURA COMPLETA DEL JSON CRUDO
+          // =========================================================
+          Logger.log(`\n⬇️⬇️ ESTRUCTURA COMPLETA DEL JSON PARA: ${filter} ⬇️⬇️`);
+          Logger.log(JSON.stringify(json, null, 2));
+          Logger.log(`⬆️⬆️ FIN DEL JSON ⬆️⬆️\n`);
+          // =========================================================
+
           const resolvedPolicies = json.resolvedPolicies || [];
           Logger.log(`[SUCCESS] Encontradas ${resolvedPolicies.length} políticas configuradas/resueltas.`);
 

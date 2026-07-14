@@ -84,6 +84,7 @@ class ChromeEndpointVerificationStrategy extends ApiStrategy {
     // Variables base
     let forceList = [];
     let isEVForced = false;
+    let schemaNotFound = false;
     // ID oficial de la extensión de Endpoint Verification
     const evExtensionId = "callobklhcbilhphinckomhgkigmfocg"; 
 
@@ -137,6 +138,9 @@ class ChromeEndpointVerificationStrategy extends ApiStrategy {
         } else {
           Logger.log("[ID-162 - INFO] La API respondió 200, pero no devolvió políticas activas para el esquema (Lista vacía o hereda nulo).");
         }
+      } else if (code === 404) {
+        schemaNotFound = true;
+        Logger.log(`[ID-162 - WARN] Esquema 'chrome.users.ExtensionInstallForcelist' no encontrado en la API (HTTP 404). Posible deprecación o namespace incorrecto.`);
       } else {
         Logger.log(`[ID-162 - ERROR] Petición fallida a la API con HTTP ${code}`);
       }
@@ -147,7 +151,11 @@ class ChromeEndpointVerificationStrategy extends ApiStrategy {
     // 4. Lógica de Riesgos y Puntuación
     let riesgo162, comentario162, valorPrincipal;
 
-    if (isEVForced) {
+    if (schemaNotFound) {
+      riesgo162 = "Medio";
+      valorPrincipal = "No Disponible vía API";
+      comentario162 = "El esquema de política no fue encontrado en la Chrome Policy API (HTTP 404). Es posible que la política haya sido deprecada, renombrada, o pertenezca a un nivel jerárquico diferente.";
+    } else if (isEVForced) {
       riesgo162 = "Bajo";
       valorPrincipal = "Forzado";
       comentario162 = `La extensión de Endpoint Verification (${evExtensionId}) está configurada correctamente en la lista de instalación forzada ('extensionInstallForcelist'). Esto asegura la recopilación obligatoria de la postura del dispositivo para utilizar Context-Aware Access.`;

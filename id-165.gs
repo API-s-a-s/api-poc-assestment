@@ -5,7 +5,6 @@
  * * ID Evaluado: ID-165
  * Configuración Evaluada: Habilitar la integridad del código del renderizador (habilitado por defecto)
  * Filtro de Esquema / Búsqueda: chrome.users.RendererCodeIntegrity
- * Variable de Configuración Real API: rendererCodeIntegrityEnabled (camelCase)
  */
 class ChromeRendererCodeIntegrityStrategy extends ApiStrategy {
   constructor(customerId) {
@@ -82,6 +81,7 @@ class ChromeRendererCodeIntegrityStrategy extends ApiStrategy {
 
     let rendererCodeIntegrityEnabled = null;
     let anyFound = false;
+    let schemaNotFound = false;
 
     // 3. Preparar la llamada a la Chrome Policy API
     const url = `https://chromepolicy.googleapis.com/v1/customers/${this.customerId}/policies:resolve`;
@@ -130,6 +130,9 @@ class ChromeRendererCodeIntegrityStrategy extends ApiStrategy {
         } else {
           Logger.log("[ID-165 - INFO] La API no devolvió políticas explícitas. Chrome aplicará su comportamiento nativo (Habilitado por defecto).");
         }
+      } else if (code === 404) {
+        schemaNotFound = true;
+        Logger.log(`[ID-165 - WARN] Esquema no encontrado en la API (HTTP 404). Posible deprecación o namespace incorrecto.`);
       } else {
         Logger.log(`[ID-165 - ERROR] Petición fallida a la API con HTTP ${code}`);
       }
@@ -140,7 +143,11 @@ class ChromeRendererCodeIntegrityStrategy extends ApiStrategy {
     // 4. Lógica de Riesgos y Construcción de la Respuesta
     let riesgo165, comentario165, valorPrincipal;
 
-    if (rendererCodeIntegrityEnabled === true) {
+    if (schemaNotFound) {
+      riesgo165 = "Medio";
+      valorPrincipal = "No Disponible vía API";
+      comentario165 = "El esquema de política no fue encontrado en la Chrome Policy API (HTTP 404). Es posible que la política haya sido deprecada, renombrada, o pertenezca a un nivel jerárquico diferente.";
+    } else if (rendererCodeIntegrityEnabled === true) {
       riesgo165 = "Bajo";
       valorPrincipal = "Habilitado (Forzado)";
       comentario165 = "La integridad del código del renderizador está explícitamente forzada. Esto previene eficazmente que software de terceros o código no firmado mitigue el aislamiento de los procesos de Chrome, bloqueando ataques de inyección de código local.";

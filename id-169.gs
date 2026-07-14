@@ -78,6 +78,7 @@ class ChromePasswordAlertStrategy extends ApiStrategy {
     let warningTriggerValue = null;
     let loginUrlsValue = [];
     let anyFound = false;
+    let schemasNotFoundCount = 0;
 
     // 3. Consultar las dos políticas secuencialmente
     const schemasToFetch = [
@@ -132,6 +133,9 @@ class ChromePasswordAlertStrategy extends ApiStrategy {
           } else {
             Logger.log(`[ID-169 - INFO] Sin políticas explícitas en la raíz para ${schema}.`);
           }
+        } else if (code === 404) {
+          schemasNotFoundCount++;
+          Logger.log(`[ID-169 - WARN] Esquema '${schema}' no encontrado (HTTP 404).`);
         } else {
           Logger.log(`[ID-169 - ERROR] HTTP ${code} al consultar ${schema}`);
         }
@@ -149,7 +153,11 @@ class ChromePasswordAlertStrategy extends ApiStrategy {
     let riesgo169, comentario169, valorPrincipal;
     const triggerStr = warningTriggerValue ? warningTriggerValue.toString() : "";
 
-    if (!anyFound || warningTriggerValue === null || triggerStr.includes("OFF") || triggerStr === "0") {
+    if (schemasNotFoundCount > 0) {
+      riesgo169 = "Medio";
+      valorPrincipal = "No Disponible vía API";
+      comentario169 = "Uno o ambos esquemas de política no fueron encontrados en la Chrome Policy API (HTTP 404). Es posible que hayan sido deprecados o agrupados bajo un nuevo nombre de esquema.";
+    } else if (!anyFound || warningTriggerValue === null || triggerStr.includes("OFF") || triggerStr === "0") {
       riesgo169 = "Alto";
       valorPrincipal = "Deshabilitado / No Configurado";
       comentario169 = "La protección contra la reutilización de contraseñas (Password Alert) no está configurada o está desactivada. Esto expone a la organización al riesgo de que los usuarios introduzcan sus credenciales corporativas en sitios web de phishing o servicios de terceros no confiables sin recibir ninguna advertencia por parte de Chrome.";

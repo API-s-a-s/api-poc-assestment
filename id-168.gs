@@ -150,8 +150,8 @@ class ChromeDownloadRestrictionsStrategy extends ApiStrategy {
 
     if (!anyFound || downloadRestrictionsValue === null) {
       riesgo168 = "Alto";
-      valorPrincipal = "No Configurado (Sin Restricciones)";
-      comentario168 = "Las restricciones de descarga no están configuradas en la raíz del dominio. Chrome permite de forma nativa la descarga de cualquier tipo de archivo, transfiriendo la responsabilidad de identificar malware o ejecutables maliciosos al usuario final.";
+      valorPrincipal = "Sin Configurar (Hereda por defecto)";
+      comentario168 = "La Chrome Policy API respondió exitosamente indicando que no hay restricciones de descarga configuradas explícitamente en la OU raíz. Chrome permite de forma nativa cualquier descarga, transfiriendo la responsabilidad de identificar malware al usuario final (Riesgo de Ransomware).";
     } else {
       const restStr = downloadRestrictionsValue.toString();
 

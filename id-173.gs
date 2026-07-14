@@ -2,7 +2,6 @@
  * ID Evaluado: ID-173
  * Configuración Evaluada: Gestión de Chrome para usuarios con sesión iniciada (habilitado por defecto)
  * Filtro de Esquema / Búsqueda: chrome.users.SyncSettingsCbcm
- * Variables de Configuración Real API: syncTypeCbcm y profileReauthPrompt (Confirmado en Logs)
  */
 class ChromeSyncSettingsCbcmStrategy extends ApiStrategy {
   constructor(customerId) {
@@ -148,8 +147,8 @@ class ChromeSyncSettingsCbcmStrategy extends ApiStrategy {
 
     if (!anyFound || syncTypeCbcmValue === null) {
       riesgo173 = "Medio";
-      valorPrincipal = "No Configurado (Por Defecto)";
-      comentario173 = "La gestión de sincronización de perfiles en la nube (CBCM) no está configurada explícitamente en la raíz del dominio. Si bien Chrome asume la bajada básica de políticas, carecer de una directiva restrictiva unificada impide asegurar controles granulares sobre qué datos de los usuarios se resguardan de forma centralizada.";
+      valorPrincipal = "Sin Configurar (Hereda por defecto)";
+      comentario173 = "La Chrome Policy API respondió exitosamente sin encontrar configuración explícita para sincronización de perfiles (CBCM) en la OU raíz. Si bien Chrome asume la bajada básica de políticas, carecer de una directiva unificada impide asegurar controles granulares sobre los datos centralizados.";
     } else {
       const syncStr = syncTypeCbcmValue.toString();
 
@@ -205,8 +204,8 @@ class ChromeSyncSettingsCbcmStrategy extends ApiStrategy {
       name: this.name,
       valorPrincipal: "ERROR",
       comentario173: `Ocurrió un error inesperado al procesar la API: ${msg}`,
-      riesgo173: "Medio",
-      score173: 2
+      riesgo173: "",
+      score173: 0
     };
   }
 }

@@ -85,6 +85,7 @@ class ChromePasswordManagerStrategy extends ApiStrategy {
 
     let passwordManagerEnabled = null;
     let anyFound = false;
+    let schemaNotFound = false;
 
     // 3. Preparar la llamada a la Chrome Policy API
     const url = `https://chromepolicy.googleapis.com/v1/customers/${this.customerId}/policies:resolve`;
@@ -133,6 +134,9 @@ class ChromePasswordManagerStrategy extends ApiStrategy {
         } else {
           Logger.log("[ID-163 - INFO] La API no devolvió políticas activas para este esquema. Asumiendo valor por defecto de Google.");
         }
+      } else if (code === 404) {
+        schemaNotFound = true;
+        Logger.log(`[ID-163 - WARN] Esquema no encontrado en la API (HTTP 404). Posible deprecación o namespace incorrecto.`);
       } else {
         Logger.log(`[ID-163 - ERROR] Petición fallida a la API con HTTP ${code}`);
       }
@@ -143,8 +147,11 @@ class ChromePasswordManagerStrategy extends ApiStrategy {
     // 4. Lógica de Riesgos y Construcción de la Respuesta
     let riesgo163, comentario163, valorPrincipal;
 
-    // Si no se encuentra configuración, por defecto Chrome permite guardar contraseñas (riesgo).
-    if (!anyFound || passwordManagerEnabled === null || passwordManagerEnabled === true) {
+    if (schemaNotFound) {
+      riesgo163 = "Medio";
+      valorPrincipal = "No Disponible vía API";
+      comentario163 = "El esquema de política no fue encontrado en la Chrome Policy API (HTTP 404). Es posible que la política haya sido deprecada, renombrada, o pertenezca a un nivel jerárquico diferente.";
+    } else if (!anyFound || passwordManagerEnabled === null || passwordManagerEnabled === true) {
       riesgo163 = "Alto";
       valorPrincipal = (passwordManagerEnabled === true) ? "Habilitado" : "No Configurado (Habilitado por defecto)";
       comentario163 = "El gestor de contraseñas de Chrome está permitido. Esto incrementa el riesgo de que las credenciales corporativas se almacenen localmente en el navegador, pudiendo ser comprometidas si un atacante obtiene acceso al perfil de usuario o al dispositivo.";

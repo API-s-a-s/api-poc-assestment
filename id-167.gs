@@ -143,8 +143,8 @@ class ChromeSafeBrowsingLevelStrategy extends ApiStrategy {
 
     if (!anyFound || safeBrowsingProtectionLevel === null) {
       riesgo167 = "Medio";
-      valorPrincipal = "No Configurado (Estándar por defecto)";
-      comentario167 = "El nivel de Navegación Segura no está configurado explícitamente por el administrador en la raíz. Chrome opera bajo el modo estándar por defecto, permitiendo que los usuarios lo desactiven manualmente y perdiendo los beneficios de la telemetría avanzada y el escaneo de amenazas en tiempo real.";
+      valorPrincipal = "Sin Configurar (Hereda por defecto)";
+      comentario167 = "La Chrome Policy API respondió exitosamente pero indicó que el nivel de Navegación Segura no está configurado explícitamente en la OU raíz. Chrome opera bajo el modo estándar por defecto, permitiendo que los usuarios lo desactiven manualmente y perdiendo beneficios del escaneo de amenazas en tiempo real.";
     } else {
       const levelStr = safeBrowsingProtectionLevel.toString();
 

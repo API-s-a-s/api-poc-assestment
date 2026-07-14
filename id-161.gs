@@ -4,7 +4,6 @@
  * * ID Evaluado: ID-161
  * Configuración Evaluada: Configuración de inicio de sesión del navegador
  * Filtro de Esquema / Búsqueda: chrome.users.BrowserSignin
- * Variable de Configuración Real API: browserSignin (formato camelCase corregido)
  */
 class ChromeBrowserSigninStrategy extends ApiStrategy {
   constructor(customerId) {
@@ -133,8 +132,8 @@ class ChromeBrowserSigninStrategy extends ApiStrategy {
     if (!anyFound || browserSigninValue === null) {
       // Estado no configurado de forma explícita en la raíz
       riesgo161 = "Medio";
-      valorPrincipal = "No Configurado (Por Defecto)";
-      comentario161 = "La política de inicio de sesión no está definida explícitamente en la raíz. Chrome aplica el comportamiento por defecto permitiendo que los usuarios decidan si inician sesión o no, lo que dificulta la aplicación de directivas persistentes de seguridad a nivel de perfil corporativo.";
+      valorPrincipal = "Sin Configurar (Hereda por defecto)";
+      comentario161 = "La Chrome Policy API respondió exitosamente, pero no reportó configuraciones explícitas para esta política en la OU raíz. Chrome asume el comportamiento por defecto (opcional), permitiendo que los usuarios decidan si inician sesión, lo que dificulta forzar directivas persistentes de seguridad a nivel perfil.";
     } else {
       const valorStr = browserSigninValue.toString();
       

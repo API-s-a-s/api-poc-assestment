@@ -78,6 +78,7 @@ class ChromeUpdatePolicyOverrideStrategy extends ApiStrategy {
 
     let updatePolicyOverrideValue = null;
     let anyFound = false;
+    let schemaNotFound = false;
 
     // 3. Preparar la llamada a la Chrome Policy API
     const url = `https://chromepolicy.googleapis.com/v1/customers/${this.customerId}/policies:resolve`;
@@ -125,6 +126,9 @@ class ChromeUpdatePolicyOverrideStrategy extends ApiStrategy {
         } else {
           Logger.log("[ID-171 - INFO] La API no devolvió políticas explícitas en la raíz. Chrome heredará el comportamiento por defecto (Permitir actualizaciones automáticas siempre).");
         }
+      } else if (code === 404) {
+        schemaNotFound = true;
+        Logger.log(`[ID-171 - WARN] Esquema no encontrado en la API (HTTP 404). Posible deprecación o namespace incorrecto.`);
       } else {
         Logger.log(`[ID-171 - ERROR] Petición fallida a la API con HTTP ${code}`);
       }

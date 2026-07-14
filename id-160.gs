@@ -131,8 +131,8 @@ class ChromeMachinePolicyStrategy extends ApiStrategy {
       comentario160 = `Se detectaron ${resolvedCount} políticas a nivel de dispositivo (ámbito Machine) activas en la raíz del dominio. Políticas: ${details.join(", ")}. Esto asegura controles de máquina persistentes.`;
     } else {
       riesgo160 = "Medio";
-      valorPrincipal = "Sin Configurar";
-      comentario160 = "No se encontraron políticas activas a nivel de dispositivo (ámbito Machine, bajo el filtro chrome.devices.*). Toda la gestión de políticas está orientada a nivel de usuario o perfil. Se recomienda evaluar la aplicación de políticas de máquina para endurecer los controles de los dispositivos corporativos.";
+      valorPrincipal = "Sin Configurar (Hereda por defecto)";
+      comentario160 = "La Chrome Policy API respondió exitosamente, pero indicó que no hay políticas explícitas a nivel de dispositivo (ámbito Machine) configuradas en la OU raíz. Toda la gestión actual recae a nivel de usuario/perfil. Se recomienda evaluar la aplicación de políticas de máquina para endurecer los dispositivos corporativos.";
     }
 
     Logger.log(`[ID-160] Diagnóstico completado. Políticas encontradas: ${resolvedCount} | Riesgo: ${riesgo160}`);

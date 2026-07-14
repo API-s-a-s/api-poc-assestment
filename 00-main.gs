@@ -709,7 +709,7 @@ function ProbarApis() {
   
   try {
     // const tester = new ChromeApiTester();
-    const tester = new DeviceApiTester();
+    const tester = new ChromeApiTester();
     tester.runAllTests();
     ui.alert("✅ Pruebas de APIs de Chrome completadas. Por favor, abre 'Ver -> Registro de ejecución' para examinar los resultados detallados.");
   } catch (error) {

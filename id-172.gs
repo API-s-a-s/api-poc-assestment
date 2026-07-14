@@ -79,6 +79,7 @@ class ChromePolicyPrecedenceStrategy extends ApiStrategy {
 
     let overridesCloudPolicyValue = null;
     let anyFound = false;
+    let schemaNotFound = false;
 
     // 3. Preparar la llamada a la Chrome Policy API
     const url = `https://chromepolicy.googleapis.com/v1/customers/${this.customerId}/policies:resolve`;
@@ -126,6 +127,9 @@ class ChromePolicyPrecedenceStrategy extends ApiStrategy {
         } else {
           Logger.log("[ID-172 - INFO] La API no devolvió políticas explícitas en la raíz. Chrome respetará la jerarquía por defecto (Máquina > Usuario).");
         }
+      } else if (code === 404) {
+        schemaNotFound = true;
+        Logger.log(`[ID-172 - WARN] Esquema no encontrado en la API (HTTP 404). Posible deprecación o namespace incorrecto.`);
       } else {
         Logger.log(`[ID-172 - ERROR] Petición fallida a la API con HTTP ${code}`);
       }
@@ -136,7 +140,11 @@ class ChromePolicyPrecedenceStrategy extends ApiStrategy {
     // 4. Lógica de Riesgos y Construcción de la Respuesta
     let riesgo172, comentario172, valorPrincipal;
 
-    if (overridesCloudPolicyValue === true) {
+    if (schemaNotFound) {
+      riesgo172 = "Medio";
+      valorPrincipal = "No Disponible vía API";
+      comentario172 = "El esquema de política no fue encontrado en la Chrome Policy API (HTTP 404). Es posible que la política haya sido deprecada, renombrada, o pertenezca a un nivel jerárquico diferente.";
+    } else if (overridesCloudPolicyValue === true) {
       riesgo172 = "Alto";
       valorPrincipal = "Anulación Permitida (Inseguro)";
       comentario172 = "La política permite que las directivas a nivel de usuario en la nube anulen las directivas a nivel de máquina. Esto rompe la jerarquía recomendada de seguridad y permite que configuraciones más débiles vinculadas a un perfil de usuario sobreescriban los controles del dispositivo corporativo.";
@@ -180,8 +188,8 @@ class ChromePolicyPrecedenceStrategy extends ApiStrategy {
       name: this.name,
       valorPrincipal: "ERROR",
       comentario172: `Ocurrió un error inesperado al procesar la API: ${msg}`,
-      riesgo172: "Medio",
-      score172: 2
+      riesgo172: "",
+      score172: 0
     };
   }
 }

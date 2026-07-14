@@ -82,6 +82,7 @@ class ChromeComponentUpdatesStrategy extends ApiStrategy {
 
     let componentUpdatesEnabled = null;
     let anyFound = false;
+    let schemaNotFound = false;
 
     // 3. Preparar la llamada a la Chrome Policy API
     const url = `https://chromepolicy.googleapis.com/v1/customers/${this.customerId}/policies:resolve`;
@@ -130,6 +131,9 @@ class ChromeComponentUpdatesStrategy extends ApiStrategy {
         } else {
           Logger.log("[ID-170 - INFO] La API no devolvió políticas explícitas en la raíz. Chrome aplicará su comportamiento nativo (Habilitado por defecto).");
         }
+      } else if (code === 404) {
+        schemaNotFound = true;
+        Logger.log(`[ID-170 - WARN] Esquema no encontrado en la API (HTTP 404). Posible deprecación o namespace incorrecto.`);
       } else {
         Logger.log(`[ID-170 - ERROR] Petición fallida a la API con HTTP ${code}`);
       }
@@ -140,7 +144,11 @@ class ChromeComponentUpdatesStrategy extends ApiStrategy {
     // 4. Lógica de Riesgos y Construcción de la Respuesta
     let riesgo170, comentario170, valorPrincipal;
 
-    if (componentUpdatesEnabled === true) {
+    if (schemaNotFound) {
+      riesgo170 = "Medio";
+      valorPrincipal = "No Disponible vía API";
+      comentario170 = "El esquema de política no fue encontrado en la Chrome Policy API (HTTP 404). Es posible que la política haya sido deprecada, renombrada, o pertenezca a un nivel jerárquico diferente.";
+    } else if (componentUpdatesEnabled === true) {
       riesgo170 = "Bajo";
       valorPrincipal = "Habilitado (Forzado)";
       comentario170 = "Las actualizaciones de componentes de Chrome están explícitamente habilitadas. Esto garantiza que el navegador reciba e instale de inmediato parches de seguridad fuera de banda, actualizaciones de listas de revocación de certificados (CRLSet) y submódulos de protección contra malware sin necesidad de esperar un reinicio completo del navegador.";

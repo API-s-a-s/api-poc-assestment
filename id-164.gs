@@ -3,7 +3,6 @@
  * a través de la política CipherSuiteBlacklist.
  * Configuración Evaluada: Conjunto de cifrado RC4 en TLS (deshabilitado por defecto)
  * Filtro de Esquema / Búsqueda: chrome.users.CipherSuiteBlacklist
- * Variable de Configuración Real API: cipherSuiteBlacklist
  */
 class ChromeCipherSuiteBlacklistStrategy extends ApiStrategy {
   constructor(customerId) {
@@ -80,6 +79,7 @@ class ChromeCipherSuiteBlacklistStrategy extends ApiStrategy {
 
     let cipherSuiteBlacklist = [];
     let anyFound = false;
+    let schemaNotFound = false;
 
     // 3. Preparar la llamada a la Chrome Policy API
     const url = `https://chromepolicy.googleapis.com/v1/customers/${this.customerId}/policies:resolve`;
@@ -128,6 +128,9 @@ class ChromeCipherSuiteBlacklistStrategy extends ApiStrategy {
         } else {
           Logger.log("[ID-164 - INFO] La API no devolvió políticas activas para este esquema (Hereda comportamiento por defecto del navegador).");
         }
+      } else if (code === 404) {
+        schemaNotFound = true;
+        Logger.log(`[ID-164 - WARN] Esquema no encontrado en la API (HTTP 404). Posible deprecación o namespace incorrecto.`);
       } else {
         Logger.log(`[ID-164 - ERROR] Petición fallida a la API con HTTP ${code}`);
       }
@@ -138,7 +141,11 @@ class ChromeCipherSuiteBlacklistStrategy extends ApiStrategy {
     // 4. Lógica de Riesgos y Construcción de la Respuesta
     let riesgo164, comentario164, valorPrincipal;
 
-    if (!anyFound || cipherSuiteBlacklist.length === 0) {
+    if (schemaNotFound) {
+      riesgo164 = "Medio";
+      valorPrincipal = "No Disponible vía API";
+      comentario164 = "El esquema de política no fue encontrado en la Chrome Policy API (HTTP 404). Es posible que la política haya sido deprecada, renombrada, o pertenezca a un nivel jerárquico diferente.";
+    } else if (!anyFound || cipherSuiteBlacklist.length === 0) {
       riesgo164 = "Medio";
       valorPrincipal = "No Configurado (Por Defecto) / 0";
       comentario164 = "No se detectó una lista negra de suites de cifrado (CipherSuiteBlacklist) configurada. Si bien las versiones modernas de Chrome deshabilitan cifrados débiles como RC4 por defecto, carecer de una política explícita impide al administrador bloquear rápidamente cifrados comprometidos en el futuro (ej. vulnerabilidades TLS zero-day).";
