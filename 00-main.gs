@@ -775,7 +775,11 @@ function AuditoriaInformeInvestigacion() {
     const auditor = new SecurityAuditorFacade(auth, globalContext);
     // 1. Instanciamos las estrategias exclusivas de Gestión de Navegador
     const estrategias = [
-      // aquí van 
+      new WorkspaceReportsBigQueryExportCrossAuditStrategy(customerId),
+      new SecurityInvestigationToolUsageStrategy(customerId),
+      new RequireReviewerBulkActionsStrategy(customerId),
+      new ViewSensitiveContentStrategy(customerId),
+      new RequireActionJustificationStrategy(customerId)
     ];
     // 2. Agregamos las estrategias al auditor
     estrategias.forEach(estrategia => auditor.addStrategy(estrategia));
