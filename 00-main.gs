@@ -668,9 +668,7 @@ function AuditoriaGestionNavegador() {
       new ChromeCloudEnrollmentStrategy(customerId),
       new ChromeMachinePolicyStrategy(customerId),
       new ChromeBrowserSigninStrategy(customerId),
-      new ChromeEndpointVerificationStrategy(customerId),
       new ChromePasswordManagerStrategy(customerId),
-      new ChromeCipherSuiteBlacklistStrategy(customerId),
       new ChromeRendererCodeIntegrityStrategy(customerId),
       new ChromeAdvancedProtectionStrategy(customerId),
       new ChromeSafeBrowsingLevelStrategy(customerId),
@@ -690,6 +688,104 @@ function AuditoriaGestionNavegador() {
     
     generarResumenSemaforo();
     ui.alert("✅ Auditoría de gestión de navegadores Chrome completada con éxito.");
+  } catch (error) {
+    Logger.log("Error en auditoría de gestión de navegador: " + error.stack);
+    ui.alert("❌ Error: " + error.message);
+  }
+}
+
+/**
+ * Orquestador principal para la auditoría de Preparar y supervisar
+ */
+function AuditoriaPrepararSupervisar() {
+  const ui = SpreadsheetApp.getUi();
+  
+  try {
+    const auth = new AuthService();
+    const customerId = auth.getCustomerId();
+    
+    // 0. Inicializar contexto global en RAM (Censo de usuarios con roles y Políticas)
+    const censoWrapper = new CensusStateWrapper();
+    censoWrapper.buildAndStoreCensus(auth, customerId);
+    const censo = censoWrapper.getCensus();
+    // Inyectar diccionario OU ID → Path al motor CEL para resolución de OUs
+    CELParserEngine.ouIdToPathMap = censoWrapper.getOuMap();
+    
+    const policyQuery = new GlobalPolicyExtractor(auth, customerId);
+    const politicas = policyQuery.fetchTree();
+    
+    const globalContext = {
+      census: censo,
+      policies: politicas,
+      auth: auth
+    };
+    
+    const auditor = new SecurityAuditorFacade(auth, globalContext);
+    // 1. Instanciamos las estrategias exclusivas de Gestión de Navegador
+    const estrategias = [
+      new SecurityCenterUsageStrategy(customerId),
+      new SiemIntegrationStrategy(customerId),
+      new BigQueryLogExportStrategy(customerId),
+      new WorkspaceReportsBigQueryExportStrategy(customerId),
+      new WorkspaceSecurityRulesStrategy(customerId),
+      new SecurityActivityRulesStrategy(customerId),
+      new DomainVerificationStrategy(customerId)
+    ];
+    // 2. Agregamos las estrategias al auditor
+    estrategias.forEach(estrategia => auditor.addStrategy(estrategia));
+    ui.showModelessDialog(HtmlService.createHtmlOutput("⏳ Procesando auditoría de preparar y supervisar, puede tomar algunos segundos..."), "Estado");
+    
+    // 3. Ejecutamos las APIs
+    const resultados = auditor.ejecutarTodo();
+    
+    generarResumenSemaforo();
+    ui.alert("✅ Auditoría de preparar y supervisar completada con éxito.");
+  } catch (error) {
+    Logger.log("Error en auditoría de gestión de navegador: " + error.stack);
+    ui.alert("❌ Error: " + error.message);
+  }
+}
+
+/**
+ * Orquestador principal para la auditoría de Preparar y supervisar
+ */
+function AuditoriaInformeInvestigacion() {
+  const ui = SpreadsheetApp.getUi();
+  
+  try {
+    const auth = new AuthService();
+    const customerId = auth.getCustomerId();
+    
+    // 0. Inicializar contexto global en RAM (Censo de usuarios con roles y Políticas)
+    const censoWrapper = new CensusStateWrapper();
+    censoWrapper.buildAndStoreCensus(auth, customerId);
+    const censo = censoWrapper.getCensus();
+    // Inyectar diccionario OU ID → Path al motor CEL para resolución de OUs
+    CELParserEngine.ouIdToPathMap = censoWrapper.getOuMap();
+    
+    const policyQuery = new GlobalPolicyExtractor(auth, customerId);
+    const politicas = policyQuery.fetchTree();
+    
+    const globalContext = {
+      census: censo,
+      policies: politicas,
+      auth: auth
+    };
+    
+    const auditor = new SecurityAuditorFacade(auth, globalContext);
+    // 1. Instanciamos las estrategias exclusivas de Gestión de Navegador
+    const estrategias = [
+      // aquí van 
+    ];
+    // 2. Agregamos las estrategias al auditor
+    estrategias.forEach(estrategia => auditor.addStrategy(estrategia));
+    ui.showModelessDialog(HtmlService.createHtmlOutput("⏳ Procesando auditoría de informes e investigación, puede tomar algunos segundos..."), "Estado");
+    
+    // 3. Ejecutamos las APIs
+    const resultados = auditor.ejecutarTodo();
+    
+    generarResumenSemaforo();
+    ui.alert("✅ Auditoría de informes e investigación completada con éxito.");
   } catch (error) {
     Logger.log("Error en auditoría de gestión de navegador: " + error.stack);
     ui.alert("❌ Error: " + error.message);

@@ -1,5 +1,6 @@
 /**
- * Configuración Evaluada: Password alert
+ * Estrategia de Auditoría para la Alerta de Contraseñas de Chrome (ID-169).
+ * Evalúa si la organización tiene activadas las advertencias de protección de contraseñas.
  * Filtro de Esquema / Búsqueda: chrome.users.PasswordProtectionWarningTrigger y chrome.users.PasswordProtectionLoginURLs
  * Variables de Configuración Real API: passwordProtectionWarningTrigger y passwordProtectionLoginURLs
  */
@@ -42,7 +43,7 @@ class ChromePasswordAlertStrategy extends ApiStrategy {
       return this._buildErrorResponse(`Fallo al generar token DWD: ${e.message}`);
     }
 
-    // 2. Mapeo Robusto de la OU raíz (Estrategias A, B y C para evitar Error 404)
+    // 2. Mapeo Robusto de la OU raíz
     let rootOuId = "";
     try {
       const response = AdminDirectory.Orgunits.list(this.customerId, { type: "all" });
@@ -135,7 +136,7 @@ class ChromePasswordAlertStrategy extends ApiStrategy {
           }
         } else if (code === 404) {
           schemasNotFoundCount++;
-          Logger.log(`[ID-169 - WARN] Esquema '${schema}' no encontrado (HTTP 404).`);
+          Logger.log(`[ID-169 - WARN] Esquema '${schema}' no encontrado (HTTP 404). Google no permite consultarlo actualmente.`);
         } else {
           Logger.log(`[ID-169 - ERROR] HTTP ${code} al consultar ${schema}`);
         }
@@ -144,39 +145,34 @@ class ChromePasswordAlertStrategy extends ApiStrategy {
       }
     }
 
-    // 4. Lógica de Riesgos y Construcción de la Respuesta
-    // Valores típicos de PasswordProtectionWarningTrigger:
-    // - "PASSWORD_PROTECTION_TRIGGER_ENUM_OFF" o 0 (Desactivado)
-    // - "PASSWORD_PROTECTION_TRIGGER_ENUM_PASSWORD_REUSE" o 1 (Advertir al reutilizar)
-    // - "PASSWORD_PROTECTION_TRIGGER_ENUM_PHISHING_REUSE" o 2 (Advertir solo en sitios de phishing)
-
+    // 4. Lógica de Riesgos y Construcción de la Respuesta ajustada al CSV
     let riesgo169, comentario169, valorPrincipal;
     const triggerStr = warningTriggerValue ? warningTriggerValue.toString() : "";
 
+    // AJUSTE: Si devuelve 404, se asume Riesgo Alto con el mensaje exacto proporcionado.
     if (schemasNotFoundCount > 0) {
-      riesgo169 = "Medio";
-      valorPrincipal = "No Disponible vía API";
-      comentario169 = "Uno o ambos esquemas de política no fueron encontrados en la Chrome Policy API (HTTP 404). Es posible que hayan sido deprecados o agrupados bajo un nuevo nombre de esquema.";
-    } else if (!anyFound || warningTriggerValue === null || triggerStr.includes("OFF") || triggerStr === "0") {
       riesgo169 = "Alto";
-      valorPrincipal = "Deshabilitado / No Configurado";
-      comentario169 = "La protección contra la reutilización de contraseñas (Password Alert) no está configurada o está desactivada. Esto expone a la organización al riesgo de que los usuarios introduzcan sus credenciales corporativas en sitios web de phishing o servicios de terceros no confiables sin recibir ninguna advertencia por parte de Chrome.";
+      valorPrincipal = "No Extraíble (HTTP 404)";
+      comentario169 = "No hay forma de extraerlo. Los esquemas consultados devuelven 404. La protección contra la reutilización no está configurada, exponiendo a la organización al riesgo de phishing sin advertencias de Chrome.";
+    } 
+    // En caso de que en el futuro Google reactive el endpoint y responda 200:
+    else if (!anyFound || warningTriggerValue === null || triggerStr.includes("OFF") || triggerStr === "0") {
+      riesgo169 = "Alto";
+      valorPrincipal = "Deshabilitado";
+      comentario169 = "La protección contra la reutilización de contraseñas (Password Alert) no está configurada. Esto expone a la organización a phishing o servicios de terceros no confiables sin recibir ninguna advertencia por parte de Chrome.";
     } else {
       riesgo169 = "Bajo";
-      
       let protectionType = triggerStr.includes("PHISHING") ? "Alerta en Phishing" : "Alerta por Reutilización Global";
       valorPrincipal = `Habilitado (${protectionType})`;
       
-      comentario169 = `La protección de contraseñas está activa (${triggerStr}). Chrome advertirá a los usuarios si introducen su contraseña corporativa en sitios web peligrosos o no autorizados.`;
+      comentario169 = `La protección de contraseñas está activa (${triggerStr}). Chrome advertirá a usuarios si introducen su contraseña corporativa en web peligrosos.`;
       
       if (loginUrlsValue && loginUrlsValue.length > 0) {
         comentario169 += ` Además, se han configurado explícitamente ${loginUrlsValue.length} URL(s) corporativas para delimitar el alcance de la protección.`;
-      } else {
-        comentario169 += ` (Nota: No se detectaron URLs de inicio de sesión específicas configuradas en 'PasswordProtectionLoginURLs', lo que podría hacer que la protección asuma las configuraciones por defecto de sincronización).`;
       }
     }
 
-    Logger.log(`[ID-169] Diagnóstico Terminado. Trigger: ${warningTriggerValue} | URLs: ${loginUrlsValue.length} | Riesgo: ${riesgo169}`);
+    Logger.log(`[ID-169] Diagnóstico Terminado. Riesgo Asignado: ${riesgo169} | Valor: ${valorPrincipal}`);
     Logger.log("========== FIN DIAGNÓSTICO ID-169 ==========");
 
     return {

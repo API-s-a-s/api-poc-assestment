@@ -3,7 +3,7 @@
  * Evalúa si la organización permite que los usuarios guarden contraseñas en el navegador Chrome.
  * * ID Evaluado: ID-163
  * Configuración Evaluada: Password manager
- * Filtro de Esquema / Búsqueda: chrome.users.PasswordManagerEnabled
+ * Filtro de Esquema / Búsqueda: chrome.users.PasswordManager
  * Variable de Configuración Real API: passwordManagerEnabled (camelCase)
  */
 class ChromePasswordManagerStrategy extends ApiStrategy {
@@ -24,7 +24,7 @@ class ChromePasswordManagerStrategy extends ApiStrategy {
   }
 
   /**
-   * Evalúa la política 'chrome.users.PasswordManagerEnabled' en la raíz del dominio.
+   * Evalúa la política 'chrome.users.PasswordManager' en la raíz del dominio.
    * @param {Object} globalContext Contexto global de ejecución.
    */
   evaluateInMemory(globalContext) {
@@ -87,13 +87,13 @@ class ChromePasswordManagerStrategy extends ApiStrategy {
     let anyFound = false;
     let schemaNotFound = false;
 
-    // 3. Preparar la llamada a la Chrome Policy API
+    // 3. Preparar la llamada a la Chrome Policy API con el esquema corregido
     const url = `https://chromepolicy.googleapis.com/v1/customers/${this.customerId}/policies:resolve`;
     const payload = {
       policyTargetKey: {
         targetResource: targetResource
       },
-      policySchemaFilter: "chrome.users.PasswordManagerEnabled",
+      policySchemaFilter: "chrome.users.PasswordManager", // ESQUEMA CORREGIDO
       pageSize: 100
     };
 
@@ -108,7 +108,7 @@ class ChromePasswordManagerStrategy extends ApiStrategy {
       muteHttpExceptions: true
     };
 
-    Logger.log("[ID-163] Solicitando política chrome.users.PasswordManagerEnabled...");
+    Logger.log("[ID-163] Solicitando política chrome.users.PasswordManager...");
     try {
       const response = UrlFetchApp.fetch(url, options);
       const code = response.getResponseCode();
@@ -125,7 +125,7 @@ class ChromePasswordManagerStrategy extends ApiStrategy {
           anyFound = true;
           resolvedPolicies.forEach((policy) => {
             const val = policy.value && policy.value.value;
-            // Se valida con camelCase
+            // Se sigue validando con la variable interna camelCase
             if (val && val.passwordManagerEnabled !== undefined) {
               passwordManagerEnabled = val.passwordManagerEnabled;
               Logger.log(`[ID-163 - PARSEO] Encontrada variable 'passwordManagerEnabled'. Valor: ${passwordManagerEnabled}`);
@@ -153,12 +153,12 @@ class ChromePasswordManagerStrategy extends ApiStrategy {
       comentario163 = "El esquema de política no fue encontrado en la Chrome Policy API (HTTP 404). Es posible que la política haya sido deprecada, renombrada, o pertenezca a un nivel jerárquico diferente.";
     } else if (!anyFound || passwordManagerEnabled === null || passwordManagerEnabled === true) {
       riesgo163 = "Alto";
-      valorPrincipal = (passwordManagerEnabled === true) ? "Habilitado" : "No Configurado (Habilitado por defecto)";
+      valorPrincipal = (passwordManagerEnabled === true) ? "Habilitado" : "Habilitado por defecto";
       comentario163 = "El gestor de contraseñas de Chrome está permitido. Esto incrementa el riesgo de que las credenciales corporativas se almacenen localmente en el navegador, pudiendo ser comprometidas si un atacante obtiene acceso al perfil de usuario o al dispositivo.";
     } else {
       // passwordManagerEnabled === false
       riesgo163 = "Bajo";
-      valorPrincipal = "Deshabilitado (Seguro)";
+      valorPrincipal = "Deshabilitado";
       comentario163 = "El gestor de contraseñas de Chrome está desactivado por política. Esto es una excelente práctica para forzar el uso de herramientas de gestión de credenciales autorizadas y evitar que contraseñas sensibles queden cacheadas en el navegador.";
     }
 

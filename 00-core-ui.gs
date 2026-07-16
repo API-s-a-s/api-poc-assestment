@@ -15,6 +15,8 @@ function onOpen() {
       .addItem('🧩 Ejecutar análisis de Servicios Adicionales', 'AuditoriaServiciosAdicionales')
       .addItem('🧩 Ejecutar análisis de gestión de dispositivos', 'AuditoriaGestionDispositivos')
       .addItem('🧩 Ejecutar análisis de gestión de navegadores', 'AuditoriaGestionNavegador')      
+      .addItem('🧩 Ejecutar análisis de preparar y supervisar', 'AuditoriaPrepararSupervisar')
+      .addItem('🧩 Ejecutar análisis de informes e investigación', 'AuditoriaInformeInvestigacion')
       .addSeparator()
       .addItem('🩺 Ejecutar indice de exposición de datos personal', 'AuditoriaIEDrivePersonal')
       .addItem('🩺 Ejecutar indice de exposición de datos global', 'ProbarApis')
