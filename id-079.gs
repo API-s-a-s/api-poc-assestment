@@ -30,12 +30,15 @@ class GmailAggressiveSpamStrategy extends ApiStrategy {
     try {
       const sixMonthsAgo = new Date();
       sixMonthsAgo.setDate(sixMonthsAgo.getDate() - 180);
+      Logger.log(`[DEBUG ID-079] Iniciando checkAdminReportsForSetting para: ${settingName}. Buscando desde: ${sixMonthsAgo.toISOString()}`);
       
       const response = AdminReports.Activities.list("all", "admin", {
         eventName: "CHANGE_GMAIL_SETTING",
         startTime: sixMonthsAgo.toISOString(),
         maxResults: 50
       });
+      
+      Logger.log(`[DEBUG ID-079] Respuesta de AdminReports obtenida. Items: ${response.items ? response.items.length : 0}`);
       
       if (response.items && response.items.length > 0) {
         for (const item of response.items) {
@@ -46,6 +49,7 @@ class GmailAggressiveSpamStrategy extends ApiStrategy {
               const paramNewValue = event.parameters.find(p => p.name === "NEW_VALUE");
               
               if (paramName && paramName.value && paramName.value.toLowerCase().includes(settingName.toLowerCase())) {
+                Logger.log(`[DEBUG ID-079] Coincidencia encontrada en AdminReports. Parámetros: SETTING_NAME=${paramName.value}, ENABLED=${paramEnabled ? paramEnabled.boolValue : 'N/A'}, NEW_VALUE=${paramNewValue ? paramNewValue.value : 'N/A'}`);
                 return {
                   found: true,
                   enabled: paramEnabled ? paramEnabled.boolValue : null,
@@ -57,6 +61,7 @@ class GmailAggressiveSpamStrategy extends ApiStrategy {
           }
         }
       }
+      Logger.log(`[DEBUG ID-079] No se encontraron configuraciones en AdminReports para: ${settingName}`);
       return { found: false };
     } catch (e) {
       Logger.log(`[WARN] Reports API fallback failed: ${e.message}`);
@@ -68,8 +73,10 @@ class GmailAggressiveSpamStrategy extends ApiStrategy {
     const { policies } = globalContext;
     if (!policies) return this._buildErrorResponse("Falta el contexto global.");
 
-    // Muchas configuraciones de spam se engloban en 'gmail.spam' o variantes.
-    const spamPolicies = policies.filter(p => p.setting && ((p.setting.type || "").endsWith("gmail.spam") || (p.setting.type || "").endsWith("gmail.aggressive_spam")));
+    Logger.log(`[DEBUG ID-079] Iniciando evaluateInMemory. Total políticas recibidas: ${policies.length}`);
+    const spamPolicies = policies.filter(p => p.setting && (p.setting.type || "").includes("spam"));
+    Logger.log(`[DEBUG ID-079] Políticas de Gmail Spam filtradas: ${spamPolicies.length}`);
+    
     let isAggressiveEnabled = false;
     let dataSource = "Memory";
     let rawData = null;
@@ -81,8 +88,13 @@ class GmailAggressiveSpamStrategy extends ApiStrategy {
         rawData = rootPolicy;
         const valueNode = rootPolicy.setting.value || rootPolicy.setting;
         Logger.log(`[DEBUG ID-079] valueNode: ${JSON.stringify(valueNode)}`);
-        if (valueNode.enableAggressiveSpamFilter === true || valueNode.aggressiveSpamFiltering === true) {
+        
+        if (valueNode.enableAggressiveSpamFilter === true || 
+            valueNode.aggressiveSpamFiltering === true || 
+            valueNode.enableAggressiveFiltering === true) {
           isAggressiveEnabled = true;
+        } else if (Array.isArray(valueNode.spamOverride)) {
+          isAggressiveEnabled = valueNode.spamOverride.some(rule => rule.enableAggressiveFiltering === true);
         }
       }
     } else {
@@ -105,14 +117,14 @@ class GmailAggressiveSpamStrategy extends ApiStrategy {
       // Generalmente debe estar deshabilitada a menos que sea estrictamente necesario.
       respuestaConcreta = "Habilitado";
       riesgo079 = "Medio";
-      comentario079 = `El filtrado agresivo de spam se encuentra habilitado (Fuente: ${dataSource}). Aunque esta configuración rechaza correos sospechosos en lugar de enviarlos a la carpeta de spam, aumenta la probabilidad de falsos positivos y pérdida de correos legítimos críticos. Solo se recomienda habilitar temporalmente durante campañas de spam severas contra la organización.`;
+      comentario079 = `El filtrado agresivo de spam se encuentra habilitado Fuente: ${dataSource}.`;
     } else {
       respuestaConcreta = "Deshabilitado";
       riesgo079 = "Bajo";
-      comentario079 = `El filtrado agresivo de spam está deshabilitado (Fuente: ${dataSource}). Esto es acorde a las mejores prácticas de disponibilidad de correo, permitiendo que los controles predeterminados gestionen la reputación sin rechazar agresivamente mensajes que podrían ser falsos positivos.`;
+      comentario079 = `El filtrado agresivo de spam está deshabilitado. Fuente: ${dataSource}.`;
     }
 
-    Logger.log(`[LOG] Aggressive Spam Audit: Resultado -> ${respuestaConcreta} | Riesgo: ${riesgo079}`);
+    Logger.log(`[LOG] Aggressive Spam Audit: Resultado -> ${respuestaConcreta} | Riesgo: ${riesgo079} | Fuente: ${dataSource}`);
 
     return {
       name: this.name,

@@ -2,6 +2,7 @@
  * Estrategia para auditar la existencia de alias de dominio de prueba en Google Workspace.
  * Evalúa si existen dominios con el sufijo '.test-google-a.com' aprovisionados en el tenant.
  * Utiliza Admin SDK Directory API (v1)
+ * Desarrollada desde cero con lógica de negocio y comentarios inyectados para el ID-092.
  */
 class TestDomainAliasStrategy extends ApiStrategy {
   constructor(customerId) {
@@ -9,7 +10,7 @@ class TestDomainAliasStrategy extends ApiStrategy {
     const configIDs = [
       { 
         id: "ID-092", 
-        valueKey: "valorPrincipal", 
+        valueKey: "valorPrincipal", // Retornará la cantidad (entero) de dominios de prueba encontrados
         noteKey: "comentario092",
         riskKey: "riesgo092",
         scoreKey: "score092"
@@ -18,8 +19,8 @@ class TestDomainAliasStrategy extends ApiStrategy {
 
     super("Test Domain Alias Audit", configIDs);
     
-    // SOLUCIÓN: Faltaba inicializar this.customerId en la instancia
-    this.customerId = customerId || "my_customer";
+    // Endpoint directo a la API de Directory para listar los dominios del cliente
+    this.url = `https://admin.googleapis.com/admin/directory/v1/customer/${customerId}/domains`;
     this.category = "Email y DNS";
   }
 
@@ -36,23 +37,27 @@ class TestDomainAliasStrategy extends ApiStrategy {
   }
 
   evaluateInMemory(globalContext) {
+    Logger.log(`[DEBUG ID-092] Iniciando TestDomainAliasStrategy.evaluateInMemory para customerId: ${this.customerId}`);
     let testDomainCount = 0;
     let jsonRaw = null;
 
     try {
-      // Usamos el servicio avanzado AdminDirectory. 
-      // Al haber fijado this.customerId, ahora la llamada viajará correctamente.
+      // Usamos el servicio avanzado AdminDirectory para evadir problemas de Auth directos
       const response = AdminDirectory.Domains.list(this.customerId);
       jsonRaw = response;
       
       if (response && response.domains && response.domains.length > 0) {
-        response.domains.forEach(domainObj => {
+        Logger.log(`[DEBUG ID-092] Dominios obtenidos de AdminDirectory API: ${response.domains.length}`);
+        response.domains.forEach((domainObj, idx) => {
           const domainName = (domainObj.domainName || "").toLowerCase();
-          // Buscamos explícitamente el sufijo de dominios de prueba de Google
-          if (domainName.endsWith('.test-google-a.com')) {
+          const isTestDomain = domainName.endsWith('.test-google-a.com');
+          Logger.log(`[DEBUG ID-092] Dominio #${idx + 1}: ${domainName} | ¿Es test domain?: ${isTestDomain}`);
+          if (isTestDomain) {
             testDomainCount++;
           }
         });
+      } else {
+        Logger.log(`[DEBUG ID-092] No se retornaron dominios en la respuesta de AdminDirectory API.`);
       }
     } catch (e) {
       Logger.log(`[ERROR] Test Domain Alias Audit: ${e.message}`);
@@ -66,16 +71,14 @@ class TestDomainAliasStrategy extends ApiStrategy {
       };
     }
 
-    let riesgo092, comentario092, valorPrincipalFormateado;
+    let riesgo092, comentario092;
 
     if (testDomainCount === 0) {
       riesgo092 = "Bajo";
-      valorPrincipalFormateado = "Deshabilitado";
-      comentario092 = "No se encontraron alias de dominio de prueba predeterminados (como *.test-google-a.com). Esto minimiza la superficie de ataque y previene que actores maliciosos intenten evadir políticas de enrutamiento o esquemas de Single Sign-On (SSO) empleando el dominio de pruebas.";
+      comentario092 = "No se encontraron alias de dominio de prueba predeterminados como *.test-google-a.com.";
     } else {
       riesgo092 = "Medio";
-      valorPrincipalFormateado = `Habilitado (${testDomainCount})`;
-      comentario092 = `Se detectaron ${testDomainCount} alias de dominio de prueba (ej. *.test-google-a.com) activos en el entorno. Aunque Google los aprovisiona por defecto para procesos de migración, se recomienda eliminarlos si no están en uso activo para evitar vectores de bypass de seguridad (SSO/Enrutamiento).`;
+      comentario092 = "Se encontraron dominios *.test-google-a.com activos en el entorno.";
     }
 
     Logger.log(`[LOG] Test Domain Alias Audit: Se detectaron ${testDomainCount} dominios de prueba. | Riesgo: ${riesgo092}`);
@@ -83,7 +86,7 @@ class TestDomainAliasStrategy extends ApiStrategy {
     return {
       name: this.name,
       raw: jsonRaw,
-      valorPrincipal: valorPrincipalFormateado,
+      valorPrincipal: testDomainCount,
       comentario092: comentario092,
       riesgo092: riesgo092,
       score092: this.calcularScoreDeRiesgo(riesgo092)

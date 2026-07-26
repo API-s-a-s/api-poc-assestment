@@ -38,14 +38,17 @@ class DriveTargetAudiencesStrategy extends ApiStrategy {
     let audiencesCount = 0;
     let jsonRaw = null;
 
+    Logger.log(`[DEBUG ID-100] Iniciando DriveTargetAudiencesStrategy.evaluateInMemory...`);
+
     try {
       if (!this.authService) {
          throw new Error("Servicio de autenticación no suministrado en el constructor.");
       }
 
       const adminEmail = this.authService.getCurrentUserEmail(); 
+      Logger.log(`[DEBUG ID-100] Generando token de acceso privilegiado para: ${adminEmail}`);
       const authHeader = this.authService.getPrivilegedAuthHeader(adminEmail, [
-        "https://www.googleapis.com/auth/admin.directory.targetaudiences.readonly"
+        "https://www.googleapis.com/auth/admin.directory.group.readonly"
       ]);
 
       // Intentamos primero v1.1 (endpoint documentado), con fallback a v1
@@ -65,14 +68,14 @@ class DriveTargetAudiencesStrategy extends ApiStrategy {
           });
 
           const code = response.getResponseCode();
-          const contentType = response.getHeaders()["Content-Type"] || "";
+          const contentType = response.getHeaders()["Content-Type"] || response.getHeaders()["content-type"] || "";
           const body = response.getContentText();
 
-          Logger.log(`[ID-100] [RED] HTTP ${code} | Content-Type: ${contentType} | Body (primeros 200 chars): ${body.substring(0, 200)}`);
+          Logger.log(`[ID-100] [RED] HTTP ${code} | Content-Type: ${contentType} | Longitud Body: ${body ? body.length : 0} bytes`);
 
           // Validar que la respuesta sea JSON antes de parsear
-          if (!contentType.includes("application/json")) {
-            Logger.log(`[ID-100] [WARN] Respuesta no-JSON detectada (${contentType}). Saltando este endpoint.`);
+          if (!contentType.toLowerCase().includes("application/json")) {
+            Logger.log(`[ID-100] [WARN] Respuesta no-JSON detectada (${contentType}). Saltando este endpoint. Body parcial: ${body.substring(0, 300)}`);
             lastError = `Endpoint ${url} devolvió ${contentType} en vez de JSON (HTTP ${code})`;
             continue;
           }
@@ -84,12 +87,14 @@ class DriveTargetAudiencesStrategy extends ApiStrategy {
           }
 
           if (code !== 200) {
+            Logger.log(`[ID-100] [WARN] Código de respuesta no esperado: HTTP ${code}. Body: ${body.substring(0, 500)}`);
             lastError = `HTTP ${code}: ${body.substring(0, 200)}`;
             continue;
           }
 
           const json = JSON.parse(body);
           if (json.error) {
+            Logger.log(`[ID-100] [ERROR] Error devuelto por la API de Google: ${JSON.stringify(json.error)}`);
             lastError = `API Error: ${json.error.message || JSON.stringify(json.error)}`;
             continue;
           }
@@ -99,6 +104,12 @@ class DriveTargetAudiencesStrategy extends ApiStrategy {
           audiencesCount = audiences.length;
           jsonRaw = audiences;
           lastError = null; // Limpiar errores previos
+
+          Logger.log(`[DEBUG ID-100] Conexión exitosa a la API. Se obtuvieron ${audiencesCount} públicos objetivo.`);
+          audiences.forEach((aud, index) => {
+            Logger.log(`[DEBUG ID-100] Audiencia #${index + 1}: ID=${aud.name || 'N/A'} | DisplayName="${aud.displayName || 'N/A'}" | Description="${aud.description || 'N/A'}"`);
+          });
+
           break; // Salir del bucle de endpoints
 
         } catch (innerErr) {
@@ -108,13 +119,11 @@ class DriveTargetAudiencesStrategy extends ApiStrategy {
       }
 
       if (lastError && audiencesCount === 0 && jsonRaw === null) {
-        Logger.log(`[ID-100] [WARN] Todos los endpoints fallaron. Último error: ${lastError}. Asumiendo 0 audiencias.`);
-        // No lanzamos error: asumimos 0 audiencias si la API no es accesible
-        // (comportamiento más seguro que mostrar ERROR en el reporte)
+        Logger.log(`[ID-100] [WARN] Todos los endpoints fallaron. Último error registrado: ${lastError}. Asumiendo 0 audiencias en el reporte.`);
       }
 
     } catch (e) {
-      Logger.log(`[ERROR] Drive Target Audiences Audit: ${e.message}`);
+      Logger.log(`[ERROR] Drive Target Audiences Audit (Excepción Crítica): ${e.message}`);
       return { 
         name: this.name, 
         raw: e.message,
@@ -131,15 +140,15 @@ class DriveTargetAudiencesStrategy extends ApiStrategy {
     if (audiencesCount === 0) {
       respuestaConcreta = "0 Públicos Objetivo Configurados";
       riesgo100 = "Bajo";
-      comentario100 = "No se encontraron públicos objetivo (Target Audiences) recomendados personalizados. Cuando los usuarios de la organización comparten archivos a nivel de toda la empresa con la opción para compartir vínculos predeterminada, esto minimiza las posibilidades de exposición masiva accidental asumiendo que las políticas restrictivas predominan por defecto.";
+      comentario100 = "No se encontraron públicos objetivo recomendados personalizados, esto minimiza la exposición asumiendo que las políticas restrictivas predominan por defecto.";
     } else if (audiencesCount <= 3) {
       respuestaConcreta = `${audiencesCount} Públicos Objetivo Configuradas`;
       riesgo100 = "Medio";
-      comentario100 = "Se detectó el uso de públicos objetivo (Target Audiences). Es una práctica recomendada que permite a los usuarios compartir archivos con departamentos específicos en lugar de todos en el dominio, pero requiere revisión continua de que los grupos sean los apropiados y eviten una filtración horizontal de información.";
+      comentario100 = "Se detectó el uso de públicos objetivo.";
     } else {
       respuestaConcreta = `${audiencesCount} Públicos Objetivo Configuradas`;
       riesgo100 = "Alto";
-      comentario100 = "Existen demasiadas opciones de públicos objetivo, esto puede provocar confusión en los usuarios que comparten enlaces e incrementar el riesgo de exposición accidental a departamentos equivocados al momento de configurar permisos a los recursos de Google Drive.";
+      comentario100 = "Existen demasiadas opciones de públicos objetivo,.";
     }
 
     Logger.log(`[LOG] Drive Target Audiences Audit: Resultado -> ${respuestaConcreta} | Riesgo: ${riesgo100}`);

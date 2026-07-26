@@ -103,11 +103,11 @@ class GmailRequireAuthApprovedSendersStrategy extends ApiStrategy {
     if (isAuthRequired) {
       respuestaConcreta = "Habilitado";
       riesgo081 = "Bajo";
-      comentario081 = `La organización requiere autenticación (SPF/DKIM) para los remitentes aprobados (Fuente: ${dataSource}). Esto previene la falsificación (spoofing) de dominios de confianza que están explícitamente permitidos (whitelisted) en el filtro antispam.`;
+      comentario081 = `La organización requiere autenticación SPF/DKIM para los remitentes aprobados.`;
     } else {
       respuestaConcreta = "Deshabilitado";
       riesgo081 = "Alto";
-      comentario081 = `No se requiere autenticación para remitentes aprobados (Fuente: ${dataSource}). Si un atacante falsifica (spoofing) la dirección de correo de un dominio que está en la lista de permitidos, el mensaje evadirá los controles de spam por completo, facilitando ataques de phishing dirigidos altamente efectivos.`;
+      comentario081 = `No se requiere autenticación para remitentes aprobados.`;
     }
 
     Logger.log(`[LOG] Require Auth Approved Senders Audit: Resultado -> ${respuestaConcreta} | Riesgo: ${riesgo081}`);

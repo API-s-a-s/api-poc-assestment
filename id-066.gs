@@ -51,8 +51,9 @@ class GmailImageProxyBypassStrategy extends ApiStrategy {
         const valueNode = rootPolicy.setting.value || rootPolicy.setting;
         Logger.log(`[DEBUG ID-066] valueNode extraído: ${JSON.stringify(valueNode)}`);
         
-        if (valueNode.enableEmailImageProxyBypass === true || 
-            (valueNode.state && valueNode.state.toUpperCase() === 'ENABLED')) {
+        const bypassPatterns = valueNode.imageProxyBypassPattern || [];
+        Logger.log(`[DEBUG ID-066] Patrones de bypass encontrados: ${JSON.stringify(bypassPatterns)}`);
+        if (bypassPatterns.length > 0) {
           isBypassEnabled = true;
         }
       }

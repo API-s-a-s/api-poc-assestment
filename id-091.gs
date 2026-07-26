@@ -30,12 +30,15 @@ class GmailSmtpRelayStrategy extends ApiStrategy {
     try {
       const sixMonthsAgo = new Date();
       sixMonthsAgo.setDate(sixMonthsAgo.getDate() - 180);
+      Logger.log(`[DEBUG ID-091] Iniciando checkAdminReportsForSetting para: ${settingName}. Buscando desde: ${sixMonthsAgo.toISOString()}`);
       
       const response = AdminReports.Activities.list("all", "admin", {
         eventName: "CHANGE_GMAIL_SETTING",
         startTime: sixMonthsAgo.toISOString(),
         maxResults: 50
       });
+      
+      Logger.log(`[DEBUG ID-091] Respuesta de AdminReports obtenida. Items: ${response.items ? response.items.length : 0}`);
       
       if (response.items && response.items.length > 0) {
         for (const item of response.items) {
@@ -46,6 +49,7 @@ class GmailSmtpRelayStrategy extends ApiStrategy {
               const paramNewValue = event.parameters.find(p => p.name === "NEW_VALUE");
               
               if (paramName && paramName.value && paramName.value.toLowerCase().includes(settingName.toLowerCase())) {
+                Logger.log(`[DEBUG ID-091] Coincidencia encontrada en AdminReports. Parámetros: SETTING_NAME=${paramName.value}, ENABLED=${paramEnabled ? paramEnabled.boolValue : 'N/A'}, NEW_VALUE=${paramNewValue ? paramNewValue.value : 'N/A'}`);
                 return {
                   found: true,
                   enabled: paramEnabled ? paramEnabled.boolValue : null,
@@ -57,8 +61,10 @@ class GmailSmtpRelayStrategy extends ApiStrategy {
           }
         }
       }
+      Logger.log(`[DEBUG ID-091] No se encontraron configuraciones en AdminReports para: ${settingName}`);
       return { found: false };
     } catch (e) {
+      Logger.log(`[WARN] Reports API fallback failed: ${e.message}`);
       return { found: false, error: e.message };
     }
   }
@@ -67,7 +73,10 @@ class GmailSmtpRelayStrategy extends ApiStrategy {
     const { policies } = globalContext;
     if (!policies) return this._buildErrorResponse("Falta el contexto global.");
 
-    const relayPolicies = policies.filter(p => p.setting && ((p.setting.type || "").endsWith("gmail.smtp_relay") || (p.setting.type || "").endsWith("gmail.smtp_relay_service")));
+    Logger.log(`[DEBUG ID-091] Iniciando evaluateInMemory. Total políticas recibidas: ${policies.length}`);
+    const relayPolicies = policies.filter(p => p.setting && ((p.setting.type || "").includes("smtp_relay") || (p.setting.type || "").includes("relay")));
+    Logger.log(`[DEBUG ID-091] Políticas de Gmail SMTP Relay filtradas: ${relayPolicies.length}`);
+
     let rulesCount = 0;
     let dataSource = "Memory";
     let rawData = null;
@@ -79,10 +88,12 @@ class GmailSmtpRelayStrategy extends ApiStrategy {
         rawData = rootPolicy;
         const valueNode = rootPolicy.setting.value || rootPolicy.setting;
         Logger.log(`[DEBUG ID-091] valueNode: ${JSON.stringify(valueNode)}`);
-        const rules = valueNode.rules || valueNode.settingRules || [];
+        const rules = valueNode.rules || valueNode.settingRules || valueNode.relayRules || [];
+        Logger.log(`[DEBUG ID-091] Reglas SMTP Relay detectadas: ${rules.length}`);
         rulesCount = rules.length;
       }
     } else {
+      Logger.log(`[LOG] SMTP relay service no encontrado en v1, intentando Fase 2 (Admin Reports)...`);
       const logResult = this.checkAdminReportsForSetting("SMTP relay service");
       if (logResult.found) {
         rulesCount = (logResult.enabled === true || (logResult.newValue && logResult.newValue !== "")) ? 1 : 0;
@@ -98,13 +109,13 @@ class GmailSmtpRelayStrategy extends ApiStrategy {
 
     if (rulesCount > 0) {
       riesgo091 = "Medio"; // Requiere auditoría de IPs permitidas y métodos de autenticación
-      comentario091 = `Se encontraron ${rulesCount} configuraciones de Servicio de Retransmisión SMTP (SMTP Relay) (Fuente: ${dataSource}). Esto permite que sistemas on-premise, escáneres o aplicaciones de terceros envíen correos hacia el exterior aparentando provenir del dominio de Workspace. Es imperativo revisar periódicamente que las IPs autorizadas estén estrictamente delimitadas para evitar que el dominio sea utilizado para relay abierto de spam.`;
+      comentario091 = `Se encontraron ${rulesCount} configuraciones SMTP Relay`;
     } else {
       riesgo091 = "Bajo";
-      comentario091 = `No existen configuraciones del Servicio de Retransmisión SMTP (SMTP Relay) (Fuente: ${dataSource}). Ninguna IP o aplicación externa tiene permisos a nivel de ruteo para retransmitir correo a través de los servidores SMTP de Google para este dominio.`;
+      comentario091 = `No existen configuraciones del servicio de retransmisión SMTP.`;
     }
 
-    Logger.log(`[LOG] SMTP Relay Audit: ${rulesCount} configuraciones detectadas. | Riesgo: ${riesgo091}`);
+    Logger.log(`[LOG] SMTP Relay Audit: ${rulesCount} configuraciones detectadas. | Riesgo: ${riesgo091} | Fuente: ${dataSource}`);
 
     return {
       name: this.name,

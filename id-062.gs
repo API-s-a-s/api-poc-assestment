@@ -57,7 +57,7 @@ class GmailSmimeCertificateManagementStrategy extends ApiStrategy {
     let respuestaConcreta, riesgo062, comentario062;
 
     if (certMgmtConfigured) {
-      respuestaConcreta = "Administrado";
+      respuestaConcreta = "Habilitado";
       riesgo062 = "Bajo";
       comentario062 = "Se detectó que el enfoque de administración de certificados S/MIME está configurado y administrado a nivel dominio/usuario. Esto evita que los usuarios manipulen certificados de forma insegura y estandariza la confianza criptográfica.";
     } else {

@@ -51,9 +51,10 @@ class GmailSpamOverrideListsStrategy extends ApiStrategy {
         const valueNode = rootPolicy.setting.value || rootPolicy.setting;
         Logger.log(`[DEBUG ID-078] valueNode: ${JSON.stringify(valueNode)}`);
         
-        // Buscamos el arreglo de direcciones o dominios exentos
-        const senders = valueNode.approvedSenders || valueNode.addresses || valueNode.senders || [];
-        overrideCount = senders.length;
+        // Buscamos el arreglo de reglas de spam override
+        const overrides = valueNode.spamOverride || valueNode.approvedSenders || valueNode.addresses || valueNode.senders || [];
+        Logger.log(`[DEBUG ID-078] Reglas de Spam Override encontradas: ${overrides.length}. Detalle: ${JSON.stringify(overrides.map(o => o.description || o.ruleId || 'sin-desc'))}`);
+        overrideCount = overrides.length;
       }
     }
 

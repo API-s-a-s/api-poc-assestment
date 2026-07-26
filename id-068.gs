@@ -37,12 +37,12 @@ class GmailLinksAndExternalImagesStrategy extends ApiStrategy {
 
     const gmailPolicies = policies.filter(p => p.setting && (p.setting.type || "").endsWith("gmail.links_and_external_images"));
 
-    let isAutoDisplayEnabled = false;
+    let isWarningEnabled = false;
     let rawData = null;
 
     if (gmailPolicies.length === 0) {
       // Por defecto, asumimos que no está habilitado explícitamente
-      isAutoDisplayEnabled = false;
+      isWarningEnabled = false;
     } else {
       const rootPolicy = PolicyReducerFactory.getEffectiveRootPolicy(gmailPolicies, "gmail.links_and_external_images");
       if (rootPolicy && rootPolicy.setting) {
@@ -51,11 +51,8 @@ class GmailLinksAndExternalImagesStrategy extends ApiStrategy {
         const valueNode = rootPolicy.setting.value || rootPolicy.setting;
         Logger.log(`[DEBUG ID-068] valueNode extraído: ${JSON.stringify(valueNode)}`);
         
-        // La API v1 devuelve campos como enableExternalImageScanning
-        // Si el escaneo está deshabilitado, asumimos que se muestran automáticamente (riesgo)
-        if (valueNode.enableExternalImageScanning === false || 
-            (valueNode.state && valueNode.state.toUpperCase() === 'ENABLED')) {
-          isAutoDisplayEnabled = true;
+        if (valueNode.enableAggressiveWarningsOnUntrustedLinks === true) {
+          isWarningEnabled = true;
         }
       }
     }
@@ -64,16 +61,16 @@ class GmailLinksAndExternalImagesStrategy extends ApiStrategy {
     let respuestaConcreta;
     let riesgo068, comentario068;
 
-    if (isAutoDisplayEnabled) {
-      // Caso 1: Se muestran automáticamente (Riesgo Medio)
+    if (isWarningEnabled) {
+      // Caso 1: Advertencias habilitadas (Seguro)
       respuestaConcreta = "Habilitado";
-      riesgo068 = "Medio";
-      comentario068 = "La configuración permite cargar y mostrar automáticamente imágenes externas y enlaces en los correos electrónicos. Esto representa un riesgo moderado, ya que facilita el rastreo de lectura por parte de terceros (mediante píxeles invisibles) y aumenta la probabilidad de que los usuarios interactúen con contenido malicioso o campañas de phishing.";
-    } else {
-      // Caso 2: Se requiere confirmación manual (Seguro)
-      respuestaConcreta = "Deshabilitado";
       riesgo068 = "Bajo";
-      comentario068 = "La carga automática de imágenes externas y enlaces se encuentra restringida. El sistema exige a los usuarios una confirmación manual antes de renderizar recursos externos en los correos, lo que previene el rastreo invisible y mitiga proactivamente los ataques de suplantación de identidad (phishing).";
+      comentario068 = "Las advertencias de respuesta no intencionada y enlaces no confiables se encuentran activas. El sistema alerta a los usuarios antes de interactuar con URLs sospechosas o responder a remitentes externos no reconocidos, mitigando proactivamente los ataques de phishing e ingeniería social.";
+    } else {
+      // Caso 2: Advertencias deshabilitadas (Riesgo Alto)
+      respuestaConcreta = "Deshabilitado";
+      riesgo068 = "Alto";
+      comentario068 = "Las advertencias de respuesta no intencionada y enlaces no confiables se encuentran deshabilitadas. Los usuarios no reciben alertas al interactuar con URLs sospechosas o responder a remitentes externos, incrementando la exposición a ataques de phishing e ingeniería social.";
     }
 
     // Trazabilidad técnica para la consola del auditor

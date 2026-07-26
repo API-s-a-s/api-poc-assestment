@@ -30,12 +30,15 @@ class GmailSecuritySandboxStrategy extends ApiStrategy {
     try {
       const sixMonthsAgo = new Date();
       sixMonthsAgo.setDate(sixMonthsAgo.getDate() - 180);
+      Logger.log(`[DEBUG ID-076] Iniciando checkAdminReportsForSetting para: ${settingName}. Buscando desde: ${sixMonthsAgo.toISOString()}`);
       
       const response = AdminReports.Activities.list("all", "admin", {
         eventName: "CHANGE_GMAIL_SETTING",
         startTime: sixMonthsAgo.toISOString(),
         maxResults: 50
       });
+      
+      Logger.log(`[DEBUG ID-076] Respuesta de AdminReports obtenida. Items: ${response.items ? response.items.length : 0}`);
       
       if (response.items && response.items.length > 0) {
         for (const item of response.items) {
@@ -46,6 +49,7 @@ class GmailSecuritySandboxStrategy extends ApiStrategy {
               const paramNewValue = event.parameters.find(p => p.name === "NEW_VALUE");
               
               if (paramName && paramName.value && paramName.value.toLowerCase().includes(settingName.toLowerCase())) {
+                Logger.log(`[DEBUG ID-076] Coincidencia encontrada en AdminReports. Parámetros: SETTING_NAME=${paramName.value}, ENABLED=${paramEnabled ? paramEnabled.boolValue : 'N/A'}, NEW_VALUE=${paramNewValue ? paramNewValue.value : 'N/A'}`);
                 return {
                   found: true,
                   enabled: paramEnabled ? paramEnabled.boolValue : null,
@@ -57,6 +61,7 @@ class GmailSecuritySandboxStrategy extends ApiStrategy {
           }
         }
       }
+      Logger.log(`[DEBUG ID-076] No se encontraron configuraciones en AdminReports para: ${settingName}`);
       return { found: false };
     } catch (e) {
       Logger.log(`[WARN] Reports API fallback failed: ${e.message}`);
@@ -68,7 +73,10 @@ class GmailSecuritySandboxStrategy extends ApiStrategy {
     const { policies } = globalContext;
     if (!policies) return this._buildErrorResponse("Falta el contexto global.");
 
+    Logger.log(`[DEBUG ID-076] Iniciando evaluateInMemory. Total políticas recibidas: ${policies.length}`);
     const sandboxPolicies = policies.filter(p => p.setting && (p.setting.type || "").endsWith("gmail.security_sandbox"));
+    Logger.log(`[DEBUG ID-076] Políticas de Gmail Security Sandbox filtradas: ${sandboxPolicies.length}`);
+    
     let isSandboxEnabled = false;
     let dataSource = "Memory";
     let rawData = null;
@@ -110,7 +118,7 @@ class GmailSecuritySandboxStrategy extends ApiStrategy {
       comentario076 = `El Sandbox de seguridad de Gmail está deshabilitado (Fuente: ${dataSource}). Los usuarios están expuestos a ataques de malware de día cero (Zero-Day) o ransomware empaquetado en adjuntos, ya que estos no son detonados en un entorno aislado (sandbox) antes de llegar al buzón.`;
     }
 
-    Logger.log(`[LOG] Security Sandbox Audit: Resultado -> ${respuestaConcreta} | Riesgo: ${riesgo076}`);
+    Logger.log(`[LOG] Security Sandbox Audit: Resultado -> ${respuestaConcreta} | Riesgo: ${riesgo076} | Fuente: ${dataSource}`);
 
     return {
       name: this.name,

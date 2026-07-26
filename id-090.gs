@@ -30,12 +30,15 @@ class GmailRoutingRulesStrategy extends ApiStrategy {
     try {
       const sixMonthsAgo = new Date();
       sixMonthsAgo.setDate(sixMonthsAgo.getDate() - 180);
+      Logger.log(`[DEBUG ID-090] Iniciando checkAdminReportsForSetting para: ${settingName}. Buscando desde: ${sixMonthsAgo.toISOString()}`);
       
       const response = AdminReports.Activities.list("all", "admin", {
         eventName: "CHANGE_GMAIL_SETTING",
         startTime: sixMonthsAgo.toISOString(),
         maxResults: 50
       });
+      
+      Logger.log(`[DEBUG ID-090] Respuesta de AdminReports obtenida. Items: ${response.items ? response.items.length : 0}`);
       
       if (response.items && response.items.length > 0) {
         for (const item of response.items) {
@@ -46,6 +49,7 @@ class GmailRoutingRulesStrategy extends ApiStrategy {
               const paramNewValue = event.parameters.find(p => p.name === "NEW_VALUE");
               
               if (paramName && paramName.value && paramName.value.toLowerCase().includes(settingName.toLowerCase())) {
+                Logger.log(`[DEBUG ID-090] Coincidencia encontrada en AdminReports. Parámetros: SETTING_NAME=${paramName.value}, ENABLED=${paramEnabled ? paramEnabled.boolValue : 'N/A'}, NEW_VALUE=${paramNewValue ? paramNewValue.value : 'N/A'}`);
                 return {
                   found: true,
                   enabled: paramEnabled ? paramEnabled.boolValue : null,
@@ -57,8 +61,10 @@ class GmailRoutingRulesStrategy extends ApiStrategy {
           }
         }
       }
+      Logger.log(`[DEBUG ID-090] No se encontraron configuraciones en AdminReports para: ${settingName}`);
       return { found: false };
     } catch (e) {
+      Logger.log(`[WARN] Reports API fallback failed: ${e.message}`);
       return { found: false, error: e.message };
     }
   }
@@ -67,7 +73,10 @@ class GmailRoutingRulesStrategy extends ApiStrategy {
     const { policies } = globalContext;
     if (!policies) return this._buildErrorResponse("Falta el contexto global.");
 
-    const routingPolicies = policies.filter(p => p.setting && ((p.setting.type || "").endsWith("gmail.routing") || (p.setting.type || "").endsWith("gmail.routing_rules")));
+    Logger.log(`[DEBUG ID-090] Iniciando evaluateInMemory. Total políticas recibidas: ${policies.length}`);
+    const routingPolicies = policies.filter(p => p.setting && ((p.setting.type || "").includes("routing")));
+    Logger.log(`[DEBUG ID-090] Políticas de Gmail Routing Rules filtradas: ${routingPolicies.length}`);
+
     let rulesCount = 0;
     let dataSource = "Memory";
     let rawData = null;
@@ -79,10 +88,12 @@ class GmailRoutingRulesStrategy extends ApiStrategy {
         rawData = rootPolicy;
         const valueNode = rootPolicy.setting.value || rootPolicy.setting;
         Logger.log(`[DEBUG ID-090] valueNode: ${JSON.stringify(valueNode)}`);
-        const rules = valueNode.rules || valueNode.settingRules || [];
+        const rules = valueNode.rules || valueNode.settingRules || valueNode.routingRules || [];
+        Logger.log(`[DEBUG ID-090] Reglas de enrutamiento detectadas: ${rules.length}`);
         rulesCount = rules.length;
       }
     } else {
+      Logger.log(`[LOG] Routing rules no encontrado en v1, intentando Fase 2 (Admin Reports)...`);
       const logResult = this.checkAdminReportsForSetting("Routing");
       if (logResult.found) {
         rulesCount = (logResult.enabled === true || (logResult.newValue && logResult.newValue !== "")) ? 1 : 0;
@@ -98,13 +109,13 @@ class GmailRoutingRulesStrategy extends ApiStrategy {
 
     if (rulesCount > 0) {
       riesgo090 = "Medio"; // Medio porque el enrutamiento malicioso (ej. dual delivery oculto) es un vector clásico de exfiltración.
-      comentario090 = `Se detectaron ${rulesCount} reglas de enrutamiento adicionales (Fuente: ${dataSource}). El enrutamiento en Gmail permite desviar o duplicar (Dual Delivery) el flujo de correos hacia destinos específicos. Es crucial auditar regularmente estas reglas para garantizar que no existan desviaciones ocultas creadas por administradores malintencionados o cuentas comprometidas para robar copias del correo entrante/saliente.`;
+      comentario090 = `Se detectaron ${rulesCount} reglas de enrutamiento adicionales.`;
     } else {
       riesgo090 = "Bajo";
-      comentario090 = `No se detectaron reglas de enrutamiento adicionales (Fuente: ${dataSource}). El flujo de correo se mantiene estándar y nativo, mitigando el riesgo de que correos sean duplicados y enviados sigilosamente a servidores externos no autorizados.`;
+      comentario090 = `No se detectaron reglas de enrutamiento adicionales.`;
     }
 
-    Logger.log(`[LOG] Routing Rules Audit: ${rulesCount} reglas detectadas. | Riesgo: ${riesgo090}`);
+    Logger.log(`[LOG] Routing Rules Audit: ${rulesCount} reglas detectadas. | Riesgo: ${riesgo090} | Fuente: ${dataSource}`);
 
     return {
       name: this.name,

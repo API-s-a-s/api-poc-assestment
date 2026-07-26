@@ -51,8 +51,12 @@ class GmailSpoofingAndAuthenticationStrategy extends ApiStrategy {
         const valueNode = rootPolicy.setting.value || rootPolicy.setting;
         Logger.log(`[DEBUG ID-072] valueNode: ${JSON.stringify(valueNode)}`);
         
-        if (valueNode.enableSpoofingAndAuthentication === true || 
-            (valueNode.state && valueNode.state.toUpperCase() === 'ENABLED')) {
+        // Verificar que las protecciones principales de detección estén activas
+        const hasDetection = valueNode.detectDomainNameSpoofing === true ||
+                             valueNode.detectEmployeeNameSpoofing === true ||
+                             valueNode.detectDomainSpoofingFromUnauthenticatedSenders === true ||
+                             valueNode.detectUnauthenticatedEmails === true;
+        if (hasDetection) {
           isSpoofingProtectionEnabled = true;
         }
       }

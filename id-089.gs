@@ -30,12 +30,15 @@ class GmailOutboundGatewayStrategy extends ApiStrategy {
     try {
       const sixMonthsAgo = new Date();
       sixMonthsAgo.setDate(sixMonthsAgo.getDate() - 180);
+      Logger.log(`[DEBUG ID-089] Iniciando checkAdminReportsForSetting para: ${settingName}. Buscando desde: ${sixMonthsAgo.toISOString()}`);
       
       const response = AdminReports.Activities.list("all", "admin", {
         eventName: "CHANGE_GMAIL_SETTING",
         startTime: sixMonthsAgo.toISOString(),
         maxResults: 50
       });
+      
+      Logger.log(`[DEBUG ID-089] Respuesta de AdminReports obtenida. Items: ${response.items ? response.items.length : 0}`);
       
       if (response.items && response.items.length > 0) {
         for (const item of response.items) {
@@ -46,6 +49,7 @@ class GmailOutboundGatewayStrategy extends ApiStrategy {
               const paramNewValue = event.parameters.find(p => p.name === "NEW_VALUE");
               
               if (paramName && paramName.value && paramName.value.toLowerCase().includes(settingName.toLowerCase())) {
+                Logger.log(`[DEBUG ID-089] Coincidencia encontrada en AdminReports. Parámetros: SETTING_NAME=${paramName.value}, ENABLED=${paramEnabled ? paramEnabled.boolValue : 'N/A'}, NEW_VALUE=${paramNewValue ? paramNewValue.value : 'N/A'}`);
                 return {
                   found: true,
                   enabled: paramEnabled ? paramEnabled.boolValue : null,
@@ -57,8 +61,10 @@ class GmailOutboundGatewayStrategy extends ApiStrategy {
           }
         }
       }
+      Logger.log(`[DEBUG ID-089] No se encontraron configuraciones en AdminReports para: ${settingName}`);
       return { found: false };
     } catch (e) {
+      Logger.log(`[WARN] Reports API fallback failed: ${e.message}`);
       return { found: false, error: e.message };
     }
   }
@@ -67,23 +73,27 @@ class GmailOutboundGatewayStrategy extends ApiStrategy {
     const { policies } = globalContext;
     if (!policies) return this._buildErrorResponse("Falta el contexto global.");
 
-    const outboundPolicies = policies.filter(p => p.setting && (p.setting.type || "").endsWith("gmail.outbound_gateway"));
+    Logger.log(`[DEBUG ID-089] Iniciando evaluateInMemory. Total políticas recibidas: ${policies.length}`);
+    const outboundPolicies = policies.filter(p => p.setting && ((p.setting.type || "").includes("outbound") || (p.setting.type || "").includes("gateway")));
+    Logger.log(`[DEBUG ID-089] Políticas de Gmail Outbound Gateway filtradas: ${outboundPolicies.length}`);
+
     let isOutboundConfigured = false;
     let dataSource = "Memory";
     let rawData = null;
 
     if (outboundPolicies.length > 0) {
-      const rootPolicy = PolicyReducerFactory.getEffectiveRootPolicy(outboundPolicies, "gmail.outbound_gateway");
+      const rootPolicy = PolicyReducerFactory.getEffectiveRootPolicy(outboundPolicies, outboundPolicies[0].setting.type);
       if (rootPolicy && rootPolicy.setting) {
         Logger.log(`[DEBUG ID-089] rootPolicy: ${JSON.stringify(rootPolicy.setting)}`);
         rawData = rootPolicy;
         const valueNode = rootPolicy.setting.value || rootPolicy.setting;
         Logger.log(`[DEBUG ID-089] valueNode: ${JSON.stringify(valueNode)}`);
-        if (valueNode.gatewayIp || (valueNode.routes && valueNode.routes.length > 0)) {
+        if (valueNode.gatewayIp || valueNode.outboundGatewayHost || (valueNode.routes && valueNode.routes.length > 0)) {
           isOutboundConfigured = true;
         }
       }
     } else {
+      Logger.log(`[LOG] Outbound gateway no encontrado en v1, intentando Fase 2 (Admin Reports)...`);
       const logResult = this.checkAdminReportsForSetting("Outbound gateway");
       if (logResult.found) {
         isOutboundConfigured = logResult.enabled === true || (logResult.newValue && logResult.newValue !== "");
@@ -98,16 +108,16 @@ class GmailOutboundGatewayStrategy extends ApiStrategy {
     let respuestaConcreta, riesgo089, comentario089;
 
     if (isOutboundConfigured) {
-      respuestaConcreta = "Configurado";
+      respuestaConcreta = "Habilitado";
       riesgo089 = "Medio"; // Riesgo medio porque requiere auditoría para asegurar que el appliance tercero es seguro y soporta TLS.
-      comentario089 = `Se ha detectado un Gateway de Salida configurado (Fuente: ${dataSource}). Todo el correo saliente de la organización es retransmitido a través de servidores externos antes de ser entregado a Internet. Es vital auditar que estos servidores externos no estén comprometidos y que admitan encriptación TLS para evitar exfiltración masiva o suplantación en nombre de la empresa.`;
+      comentario089 = `Se ha detectado un Gateway de Salida configurado Fuente: ${dataSource}.`;
     } else {
-      respuestaConcreta = "No Configurado";
+      respuestaConcreta = "Deshabilitado";
       riesgo089 = "Bajo";
-      comentario089 = `No se detectó un Gateway de Salida configurado (Fuente: ${dataSource}). El tráfico saliente de correo se enruta directamente desde la infraestructura segura de Google, lo que minimiza puntos de falla y dependencias de terceros para el envío.`;
+      comentario089 = `No se detectó un Gateway de Salida configurado Fuente: ${dataSource}.`;
     }
 
-    Logger.log(`[LOG] Outbound Gateway Audit: Resultado -> ${respuestaConcreta} | Riesgo: ${riesgo089}`);
+    Logger.log(`[LOG] Outbound Gateway Audit: Resultado -> ${respuestaConcreta} | Riesgo: ${riesgo089} | Fuente: ${dataSource}`);
 
     return {
       name: this.name,

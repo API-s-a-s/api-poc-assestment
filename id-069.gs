@@ -30,12 +30,15 @@ class GmailWebOfflineStrategy extends ApiStrategy {
     try {
       const sixMonthsAgo = new Date();
       sixMonthsAgo.setDate(sixMonthsAgo.getDate() - 180);
+      Logger.log(`[DEBUG ID-069] Iniciando checkAdminReportsForSetting con settingName: ${settingName}. Buscando desde: ${sixMonthsAgo.toISOString()}`);
       
       const response = AdminReports.Activities.list("all", "admin", {
         eventName: "CHANGE_GMAIL_SETTING",
         startTime: sixMonthsAgo.toISOString(),
         maxResults: 50
       });
+      
+      Logger.log(`[DEBUG ID-069] Respuesta de AdminReports obtenida. Items: ${response.items ? response.items.length : 0}`);
       
       if (response.items && response.items.length > 0) {
         for (const item of response.items) {
@@ -46,6 +49,7 @@ class GmailWebOfflineStrategy extends ApiStrategy {
               const paramNewValue = event.parameters.find(p => p.name === "NEW_VALUE");
               
               if (paramName && paramName.value && paramName.value.toLowerCase().includes(settingName.toLowerCase())) {
+                Logger.log(`[DEBUG ID-069] Coincidencia encontrada en AdminReports. Parámetros: SETTING_NAME=${paramName.value}, ENABLED=${paramEnabled ? paramEnabled.boolValue : 'N/A'}, NEW_VALUE=${paramNewValue ? paramNewValue.value : 'N/A'}`);
                 return {
                   found: true,
                   enabled: paramEnabled ? paramEnabled.boolValue : null,
@@ -57,6 +61,7 @@ class GmailWebOfflineStrategy extends ApiStrategy {
           }
         }
       }
+      Logger.log(`[DEBUG ID-069] No se encontraron configuraciones en AdminReports para: ${settingName}`);
       return { found: false };
     } catch (e) {
       Logger.log(`[WARN] Reports API fallback failed: ${e.message}`);
@@ -68,10 +73,13 @@ class GmailWebOfflineStrategy extends ApiStrategy {
     const { policies } = globalContext;
     if (!policies) return this._buildErrorResponse("Falta el contexto global.");
 
+    Logger.log(`[DEBUG ID-069] Iniciando evaluateInMemory. Total políticas recibidas: ${policies.length}`);
     const offlinePolicies = policies.filter(p => p.setting && (
       (p.setting.type || "").endsWith("gmail.offline_web_access") || 
       (p.setting.type || "").endsWith("gmail.offline")
     ));
+    Logger.log(`[DEBUG ID-069] Políticas de Gmail Offline filtradas: ${offlinePolicies.length}`);
+    
     let isOfflineEnabled = false;
     let dataSource = "Memory";
     let rawData = null;
@@ -114,7 +122,7 @@ class GmailWebOfflineStrategy extends ApiStrategy {
       comentario069 = `El acceso a Gmail Web sin conexión está deshabilitado (Fuente: ${dataSource}). No se permite que los correos se almacenen localmente en la caché del navegador, lo que protege contra la extracción de datos en dispositivos comprometidos o de uso compartido.`;
     }
 
-    Logger.log(`[LOG] Gmail Offline Audit: Resultado -> ${respuestaConcreta} | Riesgo: ${riesgo069}`);
+    Logger.log(`[LOG] Gmail Offline Audit: Resultado -> ${respuestaConcreta} | Riesgo: ${riesgo069} | Fuente: ${dataSource}`);
 
     return {
       name: this.name,

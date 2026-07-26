@@ -779,7 +779,9 @@ function AuditoriaInformeInvestigacion() {
       new SecurityInvestigationToolUsageStrategy(customerId),
       new RequireReviewerBulkActionsStrategy(customerId),
       new ViewSensitiveContentStrategy(customerId),
-      new RequireActionJustificationStrategy(customerId)
+      new RequireActionJustificationStrategy(customerId),
+      new SecurityReportingRulesStrategy(customerId),
+      new SecurityActivityRulesAutomationStrategy(customerId)
     ];
     // 2. Agregamos las estrategias al auditor
     estrategias.forEach(estrategia => auditor.addStrategy(estrategia));

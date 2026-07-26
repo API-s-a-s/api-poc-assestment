@@ -30,12 +30,15 @@ class GmailInboundGatewayStrategy extends ApiStrategy {
     try {
       const sixMonthsAgo = new Date();
       sixMonthsAgo.setDate(sixMonthsAgo.getDate() - 180);
+      Logger.log(`[DEBUG ID-077] Iniciando checkAdminReportsForSetting para: ${settingName}. Buscando desde: ${sixMonthsAgo.toISOString()}`);
       
       const response = AdminReports.Activities.list("all", "admin", {
         eventName: "CHANGE_GMAIL_SETTING",
         startTime: sixMonthsAgo.toISOString(),
         maxResults: 50
       });
+      
+      Logger.log(`[DEBUG ID-077] Respuesta de AdminReports obtenida. Items: ${response.items ? response.items.length : 0}`);
       
       if (response.items && response.items.length > 0) {
         for (const item of response.items) {
@@ -46,6 +49,7 @@ class GmailInboundGatewayStrategy extends ApiStrategy {
               const paramNewValue = event.parameters.find(p => p.name === "NEW_VALUE");
               
               if (paramName && paramName.value && paramName.value.toLowerCase().includes(settingName.toLowerCase())) {
+                Logger.log(`[DEBUG ID-077] Coincidencia encontrada en AdminReports. Parámetros: SETTING_NAME=${paramName.value}, ENABLED=${paramEnabled ? paramEnabled.boolValue : 'N/A'}, NEW_VALUE=${paramNewValue ? paramNewValue.value : 'N/A'}`);
                 return {
                   found: true,
                   enabled: paramEnabled ? paramEnabled.boolValue : null,
@@ -57,6 +61,7 @@ class GmailInboundGatewayStrategy extends ApiStrategy {
           }
         }
       }
+      Logger.log(`[DEBUG ID-077] No se encontraron configuraciones en AdminReports para: ${settingName}`);
       return { found: false };
     } catch (e) {
       Logger.log(`[WARN] Reports API fallback failed: ${e.message}`);
@@ -68,7 +73,10 @@ class GmailInboundGatewayStrategy extends ApiStrategy {
     const { policies } = globalContext;
     if (!policies) return this._buildErrorResponse("Falta el contexto global.");
 
+    Logger.log(`[DEBUG ID-077] Iniciando evaluateInMemory. Total políticas recibidas: ${policies.length}`);
     const inboundPolicies = policies.filter(p => p.setting && (p.setting.type || "").endsWith("gmail.inbound_gateway"));
+    Logger.log(`[DEBUG ID-077] Políticas de Gmail Inbound Gateway filtradas: ${inboundPolicies.length}`);
+    
     let isInboundGatewayEnabled = false;
     let dataSource = "Memory";
     let rawData = null;
@@ -81,6 +89,7 @@ class GmailInboundGatewayStrategy extends ApiStrategy {
         const valueNode = rootPolicy.setting.value || rootPolicy.setting;
         Logger.log(`[DEBUG ID-077] valueNode: ${JSON.stringify(valueNode)}`);
         if (valueNode.gatewayIps && valueNode.gatewayIps.length > 0) {
+          Logger.log(`[DEBUG ID-077] IPs de Inbound Gateway configuradas: ${JSON.stringify(valueNode.gatewayIps)}`);
           isInboundGatewayEnabled = true;
         }
       }
@@ -101,16 +110,16 @@ class GmailInboundGatewayStrategy extends ApiStrategy {
     let respuestaConcreta, riesgo077, comentario077;
 
     if (isInboundGatewayEnabled) {
-      respuestaConcreta = "Configurado";
+      respuestaConcreta = "Habilitado";
       riesgo077 = "Medio"; // Riesgo medio porque debe revisarse que las IPs sean estrictamente conocidas y seguras
-      comentario077 = `Se ha detectado la configuración de un Gateway de Entrada (Inbound Gateway) (Fuente: ${dataSource}). Todo el correo entrante se enruta primero a través de servidores o appliances de terceros. Se recomienda encarecidamente auditar las IPs configuradas en el gateway y asegurarse de que la opción 'Rechazar correos de servidores que no sean el gateway de entrada' esté activa para evitar que los atacantes evadan el appliance saltando directamente a los servidores de Google.`;
+      comentario077 = `Se ha detectado ${dataSource}. Todo el correo entrante se enruta primero a través de servidores o appliances de terceros`;
     } else {
-      respuestaConcreta = "No Configurado";
+      respuestaConcreta = "Deshabilitado";
       riesgo077 = "Bajo";
-      comentario077 = `No se detectó un Gateway de Entrada configurado (Fuente: ${dataSource}). El tráfico de correo entrante fluye directamente hacia los servidores de Google, lo que permite que los controles de reputación y validaciones nativas operen sin interferencia de terceros.`;
+      comentario077 = `No se detectó un Gateway de entrada: ${dataSource}. El tráfico de correo fluye directamente hacia los servidores de Google.`;
     }
 
-    Logger.log(`[LOG] Inbound Gateway Audit: Resultado -> ${respuestaConcreta} | Riesgo: ${riesgo077}`);
+    Logger.log(`[LOG] Inbound Gateway Audit: Resultado -> ${respuestaConcreta} | Riesgo: ${riesgo077} | Fuente: ${dataSource}`);
 
     return {
       name: this.name,

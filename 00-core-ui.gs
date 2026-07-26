@@ -19,7 +19,7 @@ function onOpen() {
       .addItem('🧩 Ejecutar análisis de informes e investigación', 'AuditoriaInformeInvestigacion')
       .addSeparator()
       .addItem('🩺 Ejecutar indice de exposición de datos personal', 'AuditoriaIEDrivePersonal')
-      .addItem('🩺 Ejecutar indice de exposición de datos global', 'ProbarApis')
+      .addItem('🩺 Ejecutar indice de exposición de datos global', 'AuditoriaIEDriveCorporativo')
       .addSeparator()
       .addItem('ℹ️ Ayuda y Soporte', 'mostrarAyuda')
       .addToUi();

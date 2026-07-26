@@ -31,17 +31,19 @@ class GmailSpamFilterIpAllowlistStrategy extends ApiStrategy {
     return null;
   }
 
-    evaluateInMemory(globalContext) {
+  evaluateInMemory(globalContext) {
     const { policies } = globalContext;
     if (!policies) return this._buildErrorResponse("Falta el contexto global.");
 
+    Logger.log(`[DEBUG ID-074] Iniciando evaluateInMemory. Total políticas recibidas: ${policies.length}`);
     const gmailPolicies = policies.filter(p => p.setting && (p.setting.type || "").endsWith("gmail.email_spam_filter_ip_allowlist"));
+    Logger.log(`[DEBUG ID-074] Políticas de Gmail Spam Filter IP Allowlist filtradas: ${gmailPolicies.length}`);
 
     let allowedIpCount = 0;
     let rawData = null;
 
     if (gmailPolicies.length === 0) {
-      // Por defecto, asumimos que no hay IPs permitidas (lista vacía)
+      Logger.log("[DEBUG ID-074] No se encontraron políticas de lista blanca de IPs. Asumiendo 0 IPs por defecto.");
       allowedIpCount = 0;
     } else {
       const rootPolicy = PolicyReducerFactory.getEffectiveRootPolicy(gmailPolicies, "gmail.email_spam_filter_ip_allowlist");
@@ -52,7 +54,8 @@ class GmailSpamFilterIpAllowlistStrategy extends ApiStrategy {
         Logger.log(`[DEBUG ID-074] valueNode: ${JSON.stringify(valueNode)}`);
         
         // Buscamos el arreglo de IPs
-        const ips = valueNode.allowedIps || valueNode.ipAddresses || valueNode.ips || [];
+        const ips = valueNode.allowedIpAddresses || valueNode.allowedIps || valueNode.ipAddresses || valueNode.ips || [];
+        Logger.log(`[DEBUG ID-074] Direcciones IP permitidas encontradas: ${JSON.stringify(ips)}`);
         allowedIpCount = ips.length;
       }
     }
@@ -82,7 +85,7 @@ class GmailSpamFilterIpAllowlistStrategy extends ApiStrategy {
       riesgo074: riesgo074,
       score074: this.calcularScoreDeRiesgo(riesgo074)
     };
-    }
+  }
 
   _buildErrorResponse(msg) {
     return { name: this.name, valorPrincipal: "ERROR", riesgo074: "Medio", score074: 2, comentario074: msg };

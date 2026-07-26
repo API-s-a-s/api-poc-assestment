@@ -101,10 +101,10 @@ class GmailRestrictDeliveryStrategy extends ApiStrategy {
 
     if (rulesCount === 0) {
       riesgo086 = "Bajo";
-      comentario086 = `No se detectaron reglas de Restricción de Entrega (Fuente: ${dataSource}). Esto es normal para dominios públicos donde los usuarios pueden enviar y recibir correos de cualquier origen. Si este dominio debería ser exclusivamente interno, la falta de estas reglas constituye un riesgo Medio.`;
+      comentario086 = `No se detectaron reglas de Restricción de Entrega`;
     } else {
       riesgo086 = "Medio";
-      comentario086 = `Se encontraron ${rulesCount} reglas de Restricción de Entrega (Fuente: ${dataSource}). La organización está limitando proactivamente qué dominios o direcciones pueden enviar/recibir correos de ciertos usuarios, lo que es excelente para prevenir fuga de datos. Se requiere auditar las listas blancas para evitar que listas obsoletas permitan bypass.`;
+      comentario086 = `Se encontraron ${rulesCount} reglas de Restricción de Entrega.`;
     }
 
     Logger.log(`[LOG] Restrict Delivery Audit: ${rulesCount} reglas detectadas. | Riesgo: ${riesgo086}`);

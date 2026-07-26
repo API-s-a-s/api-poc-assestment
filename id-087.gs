@@ -30,12 +30,15 @@ class GmailTlsComplianceStrategy extends ApiStrategy {
     try {
       const sixMonthsAgo = new Date();
       sixMonthsAgo.setDate(sixMonthsAgo.getDate() - 180);
+      Logger.log(`[DEBUG ID-087] Iniciando checkAdminReportsForSetting para: ${settingName}. Buscando desde: ${sixMonthsAgo.toISOString()}`);
       
       const response = AdminReports.Activities.list("all", "admin", {
         eventName: "CHANGE_GMAIL_SETTING",
         startTime: sixMonthsAgo.toISOString(),
         maxResults: 50
       });
+      
+      Logger.log(`[DEBUG ID-087] Respuesta de AdminReports obtenida. Items: ${response.items ? response.items.length : 0}`);
       
       if (response.items && response.items.length > 0) {
         for (const item of response.items) {
@@ -46,6 +49,7 @@ class GmailTlsComplianceStrategy extends ApiStrategy {
               const paramNewValue = event.parameters.find(p => p.name === "NEW_VALUE");
               
               if (paramName && paramName.value && paramName.value.toLowerCase().includes(settingName.toLowerCase())) {
+                Logger.log(`[DEBUG ID-087] Coincidencia encontrada en AdminReports. Parámetros: SETTING_NAME=${paramName.value}, ENABLED=${paramEnabled ? paramEnabled.boolValue : 'N/A'}, NEW_VALUE=${paramNewValue ? paramNewValue.value : 'N/A'}`);
                 return {
                   found: true,
                   enabled: paramEnabled ? paramEnabled.boolValue : null,
@@ -57,8 +61,10 @@ class GmailTlsComplianceStrategy extends ApiStrategy {
           }
         }
       }
+      Logger.log(`[DEBUG ID-087] No se encontraron configuraciones en AdminReports para: ${settingName}`);
       return { found: false };
     } catch (e) {
+      Logger.log(`[WARN] Reports API fallback failed: ${e.message}`);
       return { found: false, error: e.message };
     }
   }
@@ -67,7 +73,10 @@ class GmailTlsComplianceStrategy extends ApiStrategy {
     const { policies } = globalContext;
     if (!policies) return this._buildErrorResponse("Falta el contexto global.");
 
-    const tlsPolicies = policies.filter(p => p.setting && ((p.setting.type || "").endsWith("gmail.secure_transport") || (p.setting.type || "").endsWith("gmail.tls_compliance")));
+    Logger.log(`[DEBUG ID-087] Iniciando evaluateInMemory. Total políticas recibidas: ${policies.length}`);
+    const tlsPolicies = policies.filter(p => p.setting && ((p.setting.type || "").includes("tls") || (p.setting.type || "").includes("secure_transport")));
+    Logger.log(`[DEBUG ID-087] Políticas de Gmail TLS Compliance filtradas: ${tlsPolicies.length}`);
+
     let rulesCount = 0;
     let dataSource = "Memory";
     let rawData = null;
@@ -79,10 +88,12 @@ class GmailTlsComplianceStrategy extends ApiStrategy {
         rawData = rootPolicy;
         const valueNode = rootPolicy.setting.value || rootPolicy.setting;
         Logger.log(`[DEBUG ID-087] valueNode: ${JSON.stringify(valueNode)}`);
-        const rules = valueNode.rules || valueNode.settingRules || [];
+        const rules = valueNode.rules || valueNode.settingRules || valueNode.tlsRules || [];
+        Logger.log(`[DEBUG ID-087] Reglas TLS detectadas: ${rules.length}`);
         rulesCount = rules.length;
       }
     } else {
+      Logger.log(`[LOG] Secure transport no encontrado en v1, intentando Fase 2 (Admin Reports)...`);
       const logResult = this.checkAdminReportsForSetting("Secure transport");
       if (logResult.found) {
         rulesCount = (logResult.enabled === true || (logResult.newValue && logResult.newValue !== "")) ? 1 : 0;
@@ -98,13 +109,13 @@ class GmailTlsComplianceStrategy extends ApiStrategy {
 
     if (rulesCount > 0) {
       riesgo087 = "Bajo";
-      comentario087 = `Se encontraron ${rulesCount} reglas de Cumplimiento TLS (Fuente: ${dataSource}). La organización está forzando conexiones cifradas estrictas con dominios de socios críticos, garantizando que el correo no se transmita nunca en texto plano si el servidor de destino intenta degradar la conexión (ataque downgrade).`;
+      comentario087 = `Se encontraron ${rulesCount} reglas de Cumplimiento TLS`;
     } else {
       riesgo087 = "Medio";
-      comentario087 = `No se detectaron reglas explícitas de cumplimiento de transporte seguro (TLS) (Fuente: ${dataSource}). Aunque Gmail usa TLS Oportunista para el 100% de sus conexiones, la ausencia de reglas estrictas de cumplimiento implica que, si un dominio de destino no soporta TLS, el correo se entregará en texto plano sin bloquearse.`;
+      comentario087 = `No se detectaron reglas explícitas de cumplimiento de transporte seguro TLS.`;
     }
 
-    Logger.log(`[LOG] TLS Compliance Audit: ${rulesCount} reglas detectadas. | Riesgo: ${riesgo087}`);
+    Logger.log(`[LOG] TLS Compliance Audit: ${rulesCount} reglas detectadas. | Riesgo: ${riesgo087} | Fuente: ${dataSource}`);
 
     return {
       name: this.name,

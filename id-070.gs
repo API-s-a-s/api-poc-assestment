@@ -51,8 +51,11 @@ class GmailAttachmentSafetyStrategy extends ApiStrategy {
         const valueNode = rootPolicy.setting.value || rootPolicy.setting;
         Logger.log(`[DEBUG ID-070] valueNode: ${JSON.stringify(valueNode)}`);
         
-        if (valueNode.enableEmailAttachmentSafety === true || 
-            (valueNode.state && valueNode.state.toUpperCase() === 'ENABLED')) {
+        // Verificar que las protecciones principales de adjuntos estén activas
+        const hasProtection = valueNode.enableEncryptedAttachmentProtection === true ||
+                              valueNode.enableAttachmentWithScriptsProtection === true ||
+                              valueNode.enableAnomalousAttachmentProtection === true;
+        if (hasProtection) {
           isAttachmentSafetyEnabled = true;
         }
       }

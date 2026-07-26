@@ -31,20 +31,22 @@ class GmailBlockedSenderListsStrategy extends ApiStrategy {
     return null;
   }
 
-    evaluateInMemory(globalContext) {
+  evaluateInMemory(globalContext) {
     const { policies } = globalContext;
     if (!policies) return this._buildErrorResponse("Falta el contexto global.");
 
-    const gmailPolicies = policies.filter(p => p.setting && (p.setting.type || "").endsWith("gmail.blocked_sender_lists"));
+    Logger.log(`[DEBUG ID-082] Iniciando evaluateInMemory. Total políticas recibidas: ${policies.length}`);
+    const gmailPolicies = policies.filter(p => p.setting && ((p.setting.type || "").endsWith("gmail.blocked_sender_lists") || (p.setting.type || "").includes("blocked")));
+    Logger.log(`[DEBUG ID-082] Políticas de Blocked Sender Lists filtradas: ${gmailPolicies.length}`);
 
     let blockedCount = 0;
     let rawData = null;
 
     if (gmailPolicies.length === 0) {
-      // Por defecto, asumimos lista vacía
+      Logger.log(`[DEBUG ID-082] No se encontraron políticas de listas de bloqueados. Asumiendo 0 remitentes bloqueados.`);
       blockedCount = 0;
     } else {
-      const rootPolicy = PolicyReducerFactory.getEffectiveRootPolicy(gmailPolicies, "gmail.blocked_sender_lists");
+      const rootPolicy = PolicyReducerFactory.getEffectiveRootPolicy(gmailPolicies, gmailPolicies[0].setting.type);
       if (rootPolicy && rootPolicy.setting) {
         Logger.log(`[DEBUG ID-082] rootPolicy: ${JSON.stringify(rootPolicy.setting)}`);
         rawData = rootPolicy;
@@ -52,7 +54,8 @@ class GmailBlockedSenderListsStrategy extends ApiStrategy {
         Logger.log(`[DEBUG ID-082] valueNode: ${JSON.stringify(valueNode)}`);
         
         // Buscamos el arreglo de direcciones o dominios bloqueados
-        const senders = valueNode.blockedSenders || valueNode.addresses || valueNode.senders || [];
+        const senders = valueNode.blockedSenders || valueNode.addresses || valueNode.senders || valueNode.blocked_senders || [];
+        Logger.log(`[DEBUG ID-082] Remitentes/Dominios bloqueados encontrados: ${senders.length}`);
         blockedCount = senders.length;
       }
     }
@@ -63,11 +66,11 @@ class GmailBlockedSenderListsStrategy extends ApiStrategy {
     if (blockedCount === 0) {
       // Caso 1: Lista vacía (Riesgo Medio por falta de bloqueos manuales)
       riesgo082 = "Medio";
-      comentario082 = "La lista de remitentes bloqueados (Blocklist) se encuentra vacía. La organización no ha configurado bloqueos explícitos para dominios o direcciones de correo maliciosas comprobadas, dependiendo exclusivamente de los filtros automatizados y globales de Google Workspace.";
+      comentario082 = "La lista de remitentes bloqueados se encuentra vacía.";
     } else {
       // Caso 2: Existen remitentes vetados (Seguro / Proactivo)
       riesgo082 = "Bajo";
-      comentario082 = "Indica la cantidad de dominios o direcciones de correo electrónico explícitamente vetados. La organización mantiene listas de bloqueo activas como medida proactiva para rechazar correos provenientes de atacantes conocidos, mitigando campañas recurrentes de phishing o spam.";
+      comentario082 = "Indica la cantidad de dominios o direcciones de correo electrónico explícitamente vetados.";
     }
 
     // Trazabilidad técnica para la consola del auditor

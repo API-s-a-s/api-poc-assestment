@@ -51,14 +51,13 @@ class WorkspaceSyncForOutlookStrategy extends ApiStrategy {
         const valueNode = rootPolicy.setting.value || rootPolicy.setting;
         Logger.log(`[DEBUG ID-064] valueNode extraído: ${JSON.stringify(valueNode)}`);
         
-        if (valueNode.enableWorkspaceSyncForOutlook === true || 
+        if (valueNode.enableGoogleWorkspaceSyncForMicrosoftOutlook === true || 
             (valueNode.state && valueNode.state.toUpperCase() === 'ENABLED')) {
           isSyncEnabled = true;
         }
       }
     }
 
-    // --- 3. LÓGICA DE SALIDA Y APLICACIÓN DE REGLAS DE NEGOCIO INFERIDAS ---
     let respuestaConcreta;
     let riesgo064, comentario064;
 

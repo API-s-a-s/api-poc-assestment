@@ -51,8 +51,7 @@ class GmailAttachmentSafetyId073Strategy extends ApiStrategy {
         const valueNode = rootPolicy.setting.value || rootPolicy.setting;
         Logger.log(`[DEBUG ID-073] valueNode: ${JSON.stringify(valueNode)}`);
         
-        if (valueNode.enableEmailAttachmentSafety === true || 
-            (valueNode.state && valueNode.state.toUpperCase() === 'ENABLED')) {
+        if (valueNode.applyFutureRecommendedSettingsAutomatically === true) {
           isAttachmentSafetyEnabled = true;
         }
       }

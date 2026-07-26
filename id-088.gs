@@ -48,6 +48,8 @@ class MtaStsRecordAuditStrategy extends ApiStrategy {
   }
 
   parseResponse(json) {
+    Logger.log(`[DEBUG ID-088] Iniciando parseResponse para MTA-STS DNS Audit. Status DNS: ${json ? json.Status : 'N/A'}`);
+    
     // 1. EVALUACIÓN EN CASO DE ERROR DE RED O API
     if (json.error || (json.Status !== 0 && json.Status !== 3)) {
       Logger.log(`[ERROR] MTA-STS Audit: Fallo al consultar el DNS. Detalles: ${JSON.stringify(json)}`);
@@ -66,16 +68,21 @@ class MtaStsRecordAuditStrategy extends ApiStrategy {
 
     // 2. PARSEO DE REGISTROS DNS
     if (json.Answer && json.Answer.length > 0) {
-      json.Answer.forEach(record => {
+      Logger.log(`[DEBUG ID-088] Registros TXT recibidos de Google DNS: ${json.Answer.length}`);
+      json.Answer.forEach((record, index) => {
         // Extraemos el texto del registro TXT
         const recordData = (record.data || "").toLowerCase();
+        Logger.log(`[DEBUG ID-088] Registro #${index + 1}: ${recordData}`);
         
         // Un registro MTA-STS válido debe comenzar declarando el protocolo v=STSv1
         if (recordData.includes("v=stsv1")) {
           mtaStsRecord = recordData;
           isMtaStsEnabled = true;
+          Logger.log(`[DEBUG ID-088] ¡Registro MTA-STS válido detectado! -> ${mtaStsRecord}`);
         }
       });
+    } else {
+      Logger.log(`[DEBUG ID-088] No se encontraron registros TXT (Answer array vacío) para _mta-sts.`);
     }
 
     // --- 3. LÓGICA DE SALIDA Y APLICACIÓN DE REGLAS DE NEGOCIO INFERIDAS ---
@@ -86,12 +93,12 @@ class MtaStsRecordAuditStrategy extends ApiStrategy {
       // Caso 1: MTA-STS activo (Seguro)
       respuestaConcreta = "Habilitado";
       riesgo088 = "Bajo";
-      comentario088 = `El dominio cuenta con un registro MTA-STS válido (${mtaStsRecord}). Esto garantiza que los servidores de correo externos estén obligados a usar conexiones cifradas (TLS) y validar el certificado de Google Workspace antes de transferir mensajes, mitigando ataques de interceptación (Man-in-the-Middle).`;
+      comentario088 = `El dominio cuenta con un registro MTA-STS válido (${mtaStsRecord}).`;
     } else {
       // Caso 2: No hay MTA-STS (Riesgo Medio)
       respuestaConcreta = "Deshabilitado";
       riesgo088 = "Medio";
-      comentario088 = "No se detectó un registro MTA-STS en el dominio. El tránsito de correos electrónicos dependerá del cifrado 'oportunista', lo que significa que si un atacante interfiere la red, la conexión podría degradarse a texto plano, exponiendo el contenido de los mensajes en tránsito.";
+      comentario088 = "No se detectó un registro MTA-STS en el dominio.";
     }
 
     // Trazabilidad técnica para la consola del auditor

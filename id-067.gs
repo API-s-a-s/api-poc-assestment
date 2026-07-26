@@ -51,7 +51,7 @@ class GmailPerUserOutboundGatewayStrategy extends ApiStrategy {
         const valueNode = rootPolicy.setting.value || rootPolicy.setting;
         Logger.log(`[DEBUG ID-067] valueNode extraído: ${JSON.stringify(valueNode)}`);
         
-        if (valueNode.enablePerUserOutboundGateway === true || 
+        if (valueNode.allowUsersToUseExternalSmtpServers === true || 
             (valueNode.state && valueNode.state.toUpperCase() === 'ENABLED')) {
           isOutboundGatewayEnabled = true;
         }
