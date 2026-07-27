@@ -54,8 +54,9 @@ class GmailAttachmentComplianceStrategy extends ApiStrategy {
         Logger.log(`[DEBUG ID-084] valueNode: ${JSON.stringify(valueNode)}`);
         
         // Buscamos el arreglo de reglas (extensiones, tipos MIME, etc.)
-        const rules = valueNode.rules || valueNode.settingRules || valueNode.complianceRules || [];
+        const rules = valueNode.attachmentComplianceRules || valueNode.rules || valueNode.settingRules || valueNode.complianceRules || [];
         rulesCount = rules.length;
+        Logger.log(`[DEBUG ID-084] Reglas de Attachment Compliance extraídas: ${rulesCount}`);
       }
     }
 
@@ -65,11 +66,11 @@ class GmailAttachmentComplianceStrategy extends ApiStrategy {
     if (rulesCount === 0) {
       // Caso 1: Cero reglas de adjuntos (Riesgo Alto por falta de controles perimetrales)
       riesgo084 = "Alto";
-      comentario084 = "No se encontraron reglas de cumplimiento de archivos adjuntos (Attachment Compliance) configuradas. La organización no está restringiendo de manera personalizada la entrada o salida de extensiones de archivos riesgosas, dejando el entorno vulnerable a la infiltración de malware dirigido o a la exfiltración de datos no autorizada a través de adjuntos permitidos.";
+      comentario084 = "No se encontraron reglas de cumplimiento de archivos adjuntos configuradas..";
     } else {
       // Caso 2: Existen reglas de adjuntos configuradas (Seguro / Maduro)
       riesgo084 = "Bajo";
-      comentario084 = "Indica la cantidad de reglas activas de cumplimiento de archivos adjuntos. La organización cuenta con políticas personalizadas que inspeccionan, bloquean o ponen en cuarentena correos en función de los tipos MIME, extensiones o características de los archivos adjuntos, mitigando proactivamente vectores de infección por malware y fugas de datos.";
+      comentario084 = "Indica la cantidad de reglas activas de cumplimiento de archivos adjuntos.";
     }
 
     // Trazabilidad técnica para la consola del auditor

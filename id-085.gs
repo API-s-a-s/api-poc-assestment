@@ -80,8 +80,14 @@ class GmailOcrAttachmentsStrategy extends ApiStrategy {
         rawData = rootPolicy;
         const valueNode = rootPolicy.setting.value || rootPolicy.setting;
         Logger.log(`[DEBUG ID-085] valueNode: ${JSON.stringify(valueNode)}`);
-        if (valueNode.enableOcr === true || valueNode.state === 'ENABLED' || valueNode.ocrEnabled === true) {
+        if (valueNode.enableOcr === true || 
+            valueNode.enableOcrTextExtraction === true || 
+            valueNode.state === 'ENABLED' || 
+            valueNode.ocrEnabled === true) {
           isOcrEnabled = true;
+        } else if (Array.isArray(valueNode.attachmentComplianceRules)) {
+          // Verificar si alguna regla tiene habilitado el motor de OCR
+          isOcrEnabled = valueNode.attachmentComplianceRules.some(r => r.enableOcr === true || r.ocrEnabled === true);
         }
       }
     } else {
@@ -103,11 +109,11 @@ class GmailOcrAttachmentsStrategy extends ApiStrategy {
     if (isOcrEnabled) {
       respuestaConcreta = "Habilitado";
       riesgo085 = "Bajo";
-      comentario085 = `El escaneo OCR para archivos adjuntos se encuentra habilitado (Fuente: ${dataSource}). Las imágenes y PDFs escaneados dentro del correo son procesados y su texto es inspeccionado por las reglas de cumplimiento (DLP), lo que previene la exfiltración de información sensible (como tarjetas de crédito o credenciales) escondida en formatos de imagen.`;
+      comentario085 = `El escaneo OCR para archivos está habillitado habilitado.`;
     } else {
       respuestaConcreta = "Deshabilitado";
       riesgo085 = "Medio";
-      comentario085 = `El reconocimiento óptico de caracteres (OCR) para adjuntos está deshabilitado (Fuente: ${dataSource}). Los datos sensibles incrustados en imágenes (fotos de tarjetas, capturas de pantalla de bases de datos) pueden evadir los controles DLP y abandonar la organización sin generar alertas.`;
+      comentario085 = `El OCR para adjuntos está deshabilitado. Fuente: ${dataSource}.`;
     }
 
     Logger.log(`[LOG] OCR Attachments Audit: Resultado -> ${respuestaConcreta} | Riesgo: ${riesgo085}`);

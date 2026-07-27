@@ -18,6 +18,7 @@ class TestDomainAliasStrategy extends ApiStrategy {
     ];
 
     super("Test Domain Alias Audit", configIDs);
+    this.customerId = customerId;
     
     // Endpoint directo a la API de Directory para listar los dominios del cliente
     this.url = `https://admin.googleapis.com/admin/directory/v1/customer/${customerId}/domains`;

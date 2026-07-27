@@ -54,8 +54,9 @@ class GmailContentComplianceStrategy extends ApiStrategy {
         Logger.log(`[DEBUG ID-083] valueNode: ${JSON.stringify(valueNode)}`);
         
         // Buscamos el arreglo de reglas (DLP, regex, palabras clave)
-        const rules = valueNode.rules || valueNode.complianceRules || valueNode.settingRules || [];
+        const rules = valueNode.contentComplianceRules || valueNode.rules || valueNode.complianceRules || valueNode.settingRules || [];
         rulesCount = rules.length;
+        Logger.log(`[DEBUG ID-083] Reglas de Content Compliance extraídas: ${rulesCount}`);
       }
     }
 
@@ -65,11 +66,11 @@ class GmailContentComplianceStrategy extends ApiStrategy {
     if (rulesCount === 0) {
       // Caso 1: Cero reglas de cumplimiento (Riesgo Alto por fuga de datos)
       riesgo083 = "Alto";
-      comentario083 = "No se encontraron reglas de cumplimiento de contenido (Content Compliance) configuradas. La organización carece de controles automatizados de Prevención de Pérdida de Datos (DLP) en los correos electrónicos, lo que permite la posible exfiltración de información sensible (como datos financieros o PII) sin restricciones ni alertas analíticas.";
+      comentario083 = "No se encontraron reglas de cumplimiento de contenido configuradas.";
     } else {
       // Caso 2: Existen reglas configuradas (Seguro / Maduro)
       riesgo083 = "Bajo";
-      comentario083 = "Indica la cantidad de reglas activas de cumplimiento de contenido. La organización cuenta con políticas de Prevención de Pérdida de Datos (DLP) estructuradas para inspeccionar y controlar el flujo de correos que contienen palabras clave específicas, patrones regulados o información confidencial.";
+      comentario083 = "Indica la cantidad de reglas activas de cumplimiento de contenido.";
     }
 
     // Trazabilidad técnica para la consola del auditor

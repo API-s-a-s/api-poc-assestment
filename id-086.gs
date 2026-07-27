@@ -80,8 +80,9 @@ class GmailRestrictDeliveryStrategy extends ApiStrategy {
         rawData = rootPolicy;
         const valueNode = rootPolicy.setting.value || rootPolicy.setting;
         Logger.log(`[DEBUG ID-086] valueNode: ${JSON.stringify(valueNode)}`);
-        const rules = valueNode.rules || valueNode.settingRules || [];
+        const rules = valueNode.restrictDeliveryRules || valueNode.rules || valueNode.settingRules || [];
         rulesCount = rules.length;
+        Logger.log(`[DEBUG ID-086] Reglas de Restrict Delivery extraídas: ${rulesCount}`);
       }
     } else {
       Logger.log(`[LOG] Restrict Delivery no encontrado en v1, intentando Fase 2 (Admin Reports)...`);
@@ -101,10 +102,10 @@ class GmailRestrictDeliveryStrategy extends ApiStrategy {
 
     if (rulesCount === 0) {
       riesgo086 = "Bajo";
-      comentario086 = `No se detectaron reglas de Restricción de Entrega`;
+      comentario086 = `No se detectaron reglas de Restricción de entrega`;
     } else {
       riesgo086 = "Medio";
-      comentario086 = `Se encontraron ${rulesCount} reglas de Restricción de Entrega.`;
+      comentario086 = `Se encontraron ${rulesCount} reglas de restricción de entrega.`;
     }
 
     Logger.log(`[LOG] Restrict Delivery Audit: ${rulesCount} reglas detectadas. | Riesgo: ${riesgo086}`);
