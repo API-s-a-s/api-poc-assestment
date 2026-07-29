@@ -17,7 +17,7 @@ class WorkspaceMarketplaceAppsAllowlistStrategy extends ApiStrategy {
     ];
 
     super("Workspace Marketplace Apps Allowlist Audit", configIDs);
-    this.category = "Integración de aplicaciones";
+    this.category = "Drive";
   }
 
   // Traductor estandarizado: Convierte la palabra clave del riesgo a valor numérico

@@ -17,7 +17,7 @@ class ManagedIosAppsStrategy extends ApiStrategy {
     ];
     super("Managed iOS Apps Audit (ID-151)", configIDs);
     this.customerId = customerId;
-    this.category = "Administración de aplicaciones";
+    this.category = "Gestión de dispositivos";
   }
 
   calcularScoreDeRiesgo(nivelRiesgo) {

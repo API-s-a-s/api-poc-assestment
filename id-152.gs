@@ -17,7 +17,7 @@ class ManagedAndroidAppsStrategy extends ApiStrategy {
     ];
     super("Managed Android Apps Audit (ID-152)", configIDs);
     this.customerId = customerId;
-    this.category = "Administración de aplicaciones";
+    this.category = "Gestión de dispositivos";
   }
 
   calcularScoreDeRiesgo(nivelRiesgo) {

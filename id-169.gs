@@ -18,7 +18,7 @@ class ChromePasswordAlertStrategy extends ApiStrategy {
 
     super("Chrome Password Alert Audit", configIDs);
     this.customerId = customerId || "my_customer";
-    this.category = "Navegación segura de Chrome";
+    this.category = "Gestión de navegadores";
   }
 
   /**

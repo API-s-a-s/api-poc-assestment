@@ -16,7 +16,7 @@ class DataLossPreventionRulesStrategy extends ApiStrategy {
     ];
 
     super("Data Loss Prevention (DLP) Audit", configIDs);
-    this.category = "Protección de datos"; 
+    this.category = "Drive"; 
   }
 
   // Traductor estandarizado: Convierte la palabra clave del riesgo a valor numérico
