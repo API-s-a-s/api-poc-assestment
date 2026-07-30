@@ -127,18 +127,18 @@ class GroupsSharingExternalMembersStrategy extends ApiStrategy {
 
     // Evaluamos la variable estricta de tipo Boolean
     if (extractedValue === false) {
-      respuestaConcreta = "Bloqueado";
+      respuestaConcreta = "Privado";
       riesgo = "Bajo";
       comentario = "Se impide que los propietarios de grupos añadan miembros externos a la organización. Esto reduce drásticamente el riesgo de fuga de datos accidental o deliberada a través de listas de distribución corporativas.";
     } else if (extractedValue === true) {
-      respuestaConcreta = "Permitido";
+      respuestaConcreta = "Publico";
       riesgo = "Alto";
       comentario = "Los propietarios de los grupos tienen permiso para añadir miembros externos. Esto expone a la organización a que terceros reciban correos electrónicos internos de distribución masiva sin supervisión del administrador.";
     } else {
       // Fallback de gobernanza: Por defecto en Google Workspace, los propietarios de grupos sí pueden añadir externos (true)
-      respuestaConcreta = "Permitido";
-      riesgo = "Alto";
-      comentario = "Google Workspace permite que los propietarios de grupos agreguen miembros externos a la organización, lo que representa un riesgo de exposición de información.";
+      respuestaConcreta = "";
+      riesgo = "";
+      comentario = "Nada detectado en los logs.";
     }
 
     Logger.log(`[LOG] Groups Sharing External Members Audit: Resultado -> ${respuestaConcreta} | Riesgo: ${riesgo} | Extracted: ${extractedValue}`);

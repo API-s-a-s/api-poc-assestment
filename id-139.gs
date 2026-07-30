@@ -147,18 +147,18 @@ class AdditionalServicesToSAuditStrategy extends ApiStrategy {
 
     // Evaluación lógica de las variables de restricción y habilitación corporativa
     if (extractedRestriction === "DENY" || extractedRestriction === "RESTRICTED" || extractedIsEnabled === false) {
-      respuestaConcreta = "Acceso Restringido (Denegación Implícita)";
+      respuestaConcreta = "Denegado";
       riesgo = "Bajo";
-      comentario = "Configuración correcta del perímetro global del dominio. Se restringe lógicamente el acceso a las aplicaciones adicionales no configuradas explícitamente. Esto implementa una política de denegación implícita que protege al Directorio de Workspace contra el procesamiento involuntario de datos corporativos en plataformas que carecen de SLAs empresariales o certificaciones normativas (HIPAA, FedRAMP).";
+      comentario = "Se restringe el acceso a las aplicaciones adicionales no configuradas explícitamente.";
     } else if (extractedRestriction === "ALLOW" || extractedRestriction === "UNRESTRICTED" || extractedIsEnabled === true) {
-      respuestaConcreta = "Acceso Abierto (Permisivo)";
+      respuestaConcreta = "Acceso Abierto";
       riesgo = "Alto";
-      comentario = "Se permite de forma irrestricta el acceso de los usuarios a servicios auxiliares y adicionales de consumo general de Google (YouTube, Blogger, herramientas de IA no empresariales). Estas plataformas eluden los Acuerdos de Nivel de Servicio (SLA) centrales del inquilino y exponen datos corporativos a enrutamientos fuera del cumplimiento corporativo.";
+      comentario = "Se permite de forma irrestricta el acceso de los usuarios a servicios auxiliares y adicionales de consumo general.";
     } else {
       // Comportamiento permisivo por defecto si Google no reporta políticas explícitas
-      respuestaConcreta = "Acceso Abierto (Valor por defecto)";
+      respuestaConcreta = "Acceso Abierto por defecto";
       riesgo = "Alto";
-      comentario = "No se detectaron directivas explícitas de control a nivel de Tenant. Google Workspace mantiene de forma predeterminada activo y abierto el acceso a los servicios adicionales de nivel de consumo, vulnerando los principios de menor privilegio y contención legal del inquilino completo.";
+      comentario = "No se detectaron directivas explícitas de control a nivel de Tenant.";
     }
 
     Logger.log(`[LOG] Servicios Adicionales ToS Access Audit: Resultado -> ${respuestaConcreta} | Riesgo: ${riesgo} | Restricción: ${extractedRestriction} | Habilitado: ${extractedIsEnabled}`);

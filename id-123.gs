@@ -1,6 +1,6 @@
 /**
  * Estrategia para auditar si se permite que aplicaciones de terceros accedan a los datos del directorio interno.
- * Evalúa el parámetro sharing_option.
+ * Evalúa el parámetro sharing_option / sharingOption.
  * Utiliza Cloud Identity Policy API (v1).
  * setting.type: settings/directory.external_directory_sharing
  */
@@ -44,17 +44,8 @@ class ContactsExternalDirectorySharingStrategy extends ApiStrategy {
     
     Logger.log(`[ID-123] Se encontraron ${targetPolicies.length} políticas en memoria mediante filtro .endsWith()`);
     
-    // INSPECCIÓN 1: Si vino vacío en memoria, veamos qué tipos de Directory sí están viniendo en el bulk
-    if (targetPolicies.length === 0) {
-      const directoryTypes = policies
-        .map(p => p.setting && p.setting.type)
-        .filter(t => t && t.toLowerCase().includes("directory"));
-      Logger.log(`[DEBUG ID-123] [ALERT] Filtro masivo vacío. Tipos de 'directory' que SÍ están en memoria: ${JSON.stringify(directoryTypes)}`);
-    }
-    
-    // Fallback híbrido: si no está en el bulk, consultar directamente a la API
+    // Fallback directo a la API si no vino en memoria
     if (targetPolicies.length === 0 && auth) {
-      Logger.log(`[ID-123] [WARNING] La API masiva no trajo configuraciones. Iniciando consulta directa a la API...`);
       try {
         const adminEmail = auth.getCurrentUserEmail(); 
         const privilegedHeader = auth.getPrivilegedAuthHeader(adminEmail, [
@@ -64,44 +55,20 @@ class ContactsExternalDirectorySharingStrategy extends ApiStrategy {
         const filter = `customer=="customers/${this.customerId}" && setting.type.matches(".*directory.external_directory_sharing.*")`;
         const url = `https://cloudidentity.googleapis.com/v1/policies?filter=${encodeURIComponent(filter)}&t=${new Date().getTime()}`;
 
-        Logger.log(`[DEBUG ID-123] URL de consulta directa: ${url}`);
-        Logger.log(`[DEBUG ID-123] Filtro aplicado: ${filter}`);
-
         const options = {
           method: "get",
           headers: { ...privilegedHeader, "Cache-Control": "no-cache" },
-          muteHttpExceptions: true // Evita que el script muera si la API responde 400 o 404, permitiendo ver el error
+          muteHttpExceptions: true
         };
 
         const response = this.fetchWithBackoff(url, options);
-        const responseText = response.getContentText();
-        
-        // INSPECCIÓN 2: Imprimir la respuesta RAW literal del servidor de Google
-        Logger.log(`[DEBUG ID-123] Respuesta RAW de Google API: ${responseText}`);
-
-        const json = JSON.parse(responseText);
-        
-        if (json.error) {
-          Logger.log(`[DEBUG ID-123] [ERROR API] Google devolvió un error estructurado: ${JSON.stringify(json.error)}`);
-        }
-
+        const json = JSON.parse(response.getContentText());
         targetPolicies = json.policies || [];
-        Logger.log(`[ID-123] [SUCCESS] API directa parseada. Encontradas: ${targetPolicies.length} políticas.`);
       } catch (e) {
-        Logger.log(`[ID-123] Error crítico al ejecutar la petición directa: ${e.message}`);
+        Logger.log(`[ID-123] Error en consulta directa a API: ${e.message}`);
       }
     }
 
-    if (targetPolicies.length > 0) {
-      Logger.log(`[ID-123] Detalles de las políticas objetivo: ` + 
-        JSON.stringify(targetPolicies.map(p => ({ 
-          type: p.setting?.type, 
-          name: p.name, 
-          orgUnit: p.policyQuery?.orgUnit 
-        })))
-      );
-    }
-    
     let extractedValue = null;
     let rawData = null;
 
@@ -109,20 +76,9 @@ class ContactsExternalDirectorySharingStrategy extends ApiStrategy {
       const rootPolicy = PolicyReducerFactory.getEffectiveRootPolicy(targetPolicies, "directory.external_directory_sharing");
       if (rootPolicy && rootPolicy.setting) {
         rawData = rootPolicy;
-        
-        // INSPECCIÓN 3: Analizar cómo estructuró Google los nodos internos de la política devuelta
-        Logger.log(`[DEBUG ID-123] Estructura completa de rootPolicy.setting: ${JSON.stringify(rootPolicy.setting)}`);
-
         const valueNode = rootPolicy.setting.value || rootPolicy.setting;
-        Logger.log(`[DEBUG ID-123] Estructura de valueNode seleccionado: ${JSON.stringify(valueNode)}`);
         
-        // Verificación de sharing_option
-        if (valueNode.sharing_option !== undefined) {
-          extractedValue = valueNode.sharing_option;
-        } else if (valueNode.sharingOption !== undefined) {
-          extractedValue = valueNode.sharingOption;
-        }
-        
+        extractedValue = valueNode.sharing_option || valueNode.sharingOption || null;
         Logger.log(`[DEBUG ID-123] Valor extraído final: ${extractedValue}`);
       }
     }
@@ -130,24 +86,22 @@ class ContactsExternalDirectorySharingStrategy extends ApiStrategy {
     let respuestaConcreta, riesgo, comentario;
 
     if (extractedValue === "REQUESTER_BASIC_PROFILE_ONLY") {
-      respuestaConcreta = "Sólo perfil básico del solicitante";
+      respuestaConcreta = "Campos básicos de usuario autenticado";
       riesgo = "Bajo";
-      comentario = "La configuración restringe el acceso de aplicaciones externas únicamente a los datos básicos del perfil del solicitante. Esto minimiza el riesgo de que un tercero descargue el directorio completo de la organización.";
+      comentario = "Solo se comparte el nombre, foto y correo del usuario autenticado con aplicaciones externas.";
     } else if (extractedValue === "ORGANIZATION_DIRECTORY_DATA") {
-      respuestaConcreta = "Datos del directorio de la organización";
+      respuestaConcreta = "Campos básicos de usuarios autenticados y organización";
       riesgo = "Alto";
-      comentario = "Se permite a las aplicaciones externas acceder a todos los datos del directorio de la organización. Esto expone nombres, correos electrónicos, alias, y relaciones jerárquicas de todos los usuarios de la empresa, facilitando ataques dirigidos (spear phishing) o exfiltración masiva.";
+      comentario = "Se comparte toda la información del directorio de la organización (contactos y perfiles) con aplicaciones externas.";
     } else if (extractedValue === "SHARING_OPTION_UNSPECIFIED") {
       respuestaConcreta = "No especificado";
-      riesgo = "Medio";
-      comentario = "La opción de uso compartido no está explícitamente especificada en la política. Se recomienda forzar a 'Sólo perfil básico del solicitante' para garantizar la postura de menor privilegio.";
+      riesgo = "";
+      comentario = "Configuración no especificada de forma explícita en las políticas del dominio.";
     } else {
-      // Fallback de gobernanza: Si no se definen políticas explícitas, Google Workspace aplica el valor 
-      // predeterminado del sistema que es permitir el acceso a los datos del directorio (ORGANIZATION_DIRECTORY_DATA),
-      // lo cual representa una postura insegura por defecto.
-      respuestaConcreta = "Datos del directorio de la organización (Valor por defecto)";
+      // Valor predeterminado de fábrica si no hay política explícita
+      respuestaConcreta = "Campos básicos de perfiles y la organización (Predeterminado)";
       riesgo = "Alto";
-      comentario = "No se encontraron políticas explícitas en la API. Por defecto, Google Workspace permite que aplicaciones de terceros accedan a todos los datos del directorio de la organización, lo que expone nombres, correos y jerarquías corporativas.";
+      comentario = "Google Workspace permite por defecto que aplicaciones externas accedan a toda la información del directorio corporativo.";
     }
 
     Logger.log(`[LOG] Contacts External Directory Sharing Audit: Resultado -> ${respuestaConcreta} | Riesgo: ${riesgo} | Extracted: ${extractedValue}`);

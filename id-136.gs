@@ -133,24 +133,24 @@ class ChatFileSharingStrategy extends ApiStrategy {
     if (extractedFileSharing === "ALL_FILES") {
       respuestaConcreta = "Permitir todos los archivos";
       riesgo = "Alto";
-      comentario = "Se permite el intercambio irrestricto de todo tipo de archivos con usuarios externos a través de Google Chat. Esto representa un vector crítico de infección por malware de día cero y ransomware inicial, facilitando que atacantes depositen binarios o documentos de Office con macros ofuscadas mediante ingeniería social.";
+      comentario = "Se permite el intercambio irrestricto de todo tipo de archivos con usuarios externos a través de Google Chat.";
     } else if (extractedFileSharing === "IMAGES_ONLY") {
       respuestaConcreta = "Solo imágenes";
       riesgo = "Medio";
-      comentario = "Se restringe el uso compartido externo exclusivamente a archivos de imagen. Funciona como un término medio razonable que bloquea de raíz la ejecución y el transporte de scripts, ejecutables y documentos maliciosos empaquetados en las salas de chat.";
+      comentario = "Se restringe el uso compartido externo exclusivamente a archivos de imagen.";
     } else if (extractedFileSharing === "NO_FILES") {
       respuestaConcreta = "Bloquear todos los archivos";
       riesgo = "Bajo";
-      comentario = "El intercambio externo de cualquier tipo de archivo a través de la plataforma de chat está completamente deshabilitado. Esta configuración maximiza el aislamiento del perímetro corporativo contra la exfiltración de información y la transferencia de cargas maliciosas.";
+      comentario = "El intercambio externo de cualquier tipo de archivo a través de la plataforma de chat está completamente deshabilitado.";
     } else if (extractedFileSharing === "FILE_SHARING_OPTION_UNSPECIFIED") {
       respuestaConcreta = "No especificado";
       riesgo = "Medio";
-      comentario = "La directiva de compartición de archivos externos no está configurada de manera explícita en esta OU. Se recomienda forzar un estado restrictivo (Solo imágenes o Bloquear todos los archivos) para evitar heredar comportamientos predeterminados permisivos.";
+      comentario = "La directiva de compartición de archivos externos no está configurada de manera explícita en esta OU. Se recomienda forzar un estado restrictivo.";
     } else {
       // Manejo seguro para políticas ausentes
-      respuestaConcreta = "Bloquear todos los archivos (Por defecto seguro)";
+      respuestaConcreta = "Bloquear todos los archivos por defecto";
       riesgo = "Bajo";
-      comentario = "No se encontraron directivas explícitas de Cloud Identity para el intercambio de archivos en Chat. El sistema aplica el comportamiento nativo restrictivo de Google Workspace para la OU evaluada.";
+      comentario = "No se detectaron políticas explícitas en la consola de admin.";
     }
 
     Logger.log(`[LOG] Chat External File Sharing Audit: Resultado -> ${respuestaConcreta} | Riesgo: ${riesgo} | Extracted: ${extractedFileSharing}`);

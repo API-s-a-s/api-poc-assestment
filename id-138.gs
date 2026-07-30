@@ -137,16 +137,16 @@ class LookerDataStudioSharingStrategy extends ApiStrategy {
     if (extractedIsEnabled === true) {
       respuestaConcreta = "Activado";
       riesgo = "Alto";
-      comentario = "El servicio de Google Data Studio (Looker) se encuentra activo a nivel de dominio. Al permitir el uso de esta plataforma de forma irrestricta, los usuarios pueden conectar repositorios de datos institucionales, BigQuery o hojas de cálculo masivas, facilitando compartir externamente informes analíticos sensibles de la organización y eludiendo las directivas de protección tradicionales de DLP.";
+      comentario = "El servicio de Google Data Studio se encuentra activo a nivel de dominio.";
     } else if (extractedIsEnabled === false) {
       respuestaConcreta = "Desactivado";
       riesgo = "Bajo";
-      comentario = "El servicio de Google Data Studio (Looker) está completamente deshabilitado a nivel de dominio. Se restringe de raíz la superficie de exposición analítica, mitigando la fuga involuntaria de tableros de control con métricas estratégicas, financieras u operativas.";
+      comentario = "El servicio de Google Data Studio está completamente deshabilitado a nivel de dominio.";
     } else {
       // Comportamiento por defecto seguro o heredado si la API no reporta políticas explícitas
       respuestaConcreta = "Activado por defecto";
       riesgo = "Alto";
-      comentario = "No se detectaron políticas explícitas en la API de Cloud Identity. El sistema aplica de forma nativa el comportamiento permisivo por defecto de Google Workspace, manteniendo Looker activo a nivel global en el dominio y requiriendo una revisión en Servicios adicionales de Google.";
+      comentario = "No se detectaron políticas explícitas en la consola de admin.";
     }
 
     Logger.log(`[LOG] Looker Data Studio Service Status Audit: Resultado -> ${respuestaConcreta} | Riesgo: ${riesgo} | Extracted: ${extractedIsEnabled}`);

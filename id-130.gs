@@ -141,22 +141,22 @@ class SitesCreationModificationStrategy extends ApiStrategy {
     if (extractedCreation === true) {
       respuestaConcreta = extractedModification ? "Permitir creación y edición" : "Solo permitir creación";
       riesgo = "Alto";
-      comentario = "La creación de nuevos sitios está habilitada de forma irrestricta. Esto permite que cualquier usuario interno genere portales de phishing aprovechando la reputación y confianza del dominio corporativo para evadir filtros externos, facilitando ataques dirigidos y la recolección ilícita de credenciales.";
+      comentario = "La creación de nuevos sitios está habilitada de forma irrestricta. Esto permite que cualquier usuario interno genere portales de phishing aprovechando la reputación y confianza del dominio.";
     } else if (extractedCreation === false) {
       if (extractedModification === true) {
-        respuestaConcreta = "Solo permitir edición de sitios existentes";
+        respuestaConcreta = "Solo permitir edición de sitios";
         riesgo = "Medio";
-        comentario = "La creación de nuevos sitios está bloqueada de forma segura, mitigando vectores de phishing de nuevos dominios. Sin embargo, se permite la edición de sitios existentes, lo que requiere supervisión sobre los portales previamente autorizados.";
+        comentario = "La creación de nuevos sitios está bloqueada de forma segura, mitigando vectores de phishing de nuevos dominios.";
       } else {
         respuestaConcreta = "Desactivado";
         riesgo = "Bajo";
-        comentario = "Tanto la creación como la edición de sitios están completamente restringidas. La gobernanza está centralizada de forma segura, anulando la superficie de exposición ante Shadow IT o phishing alojado localmente.";
+        comentario = "Tanto la creación como la edición de sitios están completamente restringidas.";
       }
     } else {
       // Manejo de valores heredados o comportamiento por defecto (Google suele permitir la creación de forma nativa)
-      respuestaConcreta = "Permitir creación";
+      respuestaConcreta = "Validar manualmente";
       riesgo = "Alto";
-      comentario = "No se encontraron políticas explícitas en la API para esta OU. El sistema hereda el comportamiento predeterminado permisivo de Google Workspace, lo que expone al dominio a la creación libre de sitios por parte de cualquier empleado.";
+      comentario = "No se encontraron políticas explícitas en la API para esta OU, lo que expone al dominio a la creación libre de sitios por parte de cualquier empleado.";
     }
 
     Logger.log(`[LOG] Sites Creation and Modification Audit: Resultado -> ${respuestaConcreta} | Riesgo: ${riesgo} | Creation: ${extractedCreation} | Modification: ${extractedModification}`);

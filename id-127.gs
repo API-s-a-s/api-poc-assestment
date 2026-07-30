@@ -131,18 +131,18 @@ class GroupsOwnersAllowExternalMembersStrategy extends ApiStrategy {
 
     // Evaluación de la variable estrictamente booleana (ownersCanAllowExternalMembers)
     if (extractedValue === true) {
-      respuestaConcreta = "Activado";
+      respuestaConcreta = "Habilitado";
       riesgo = "Alto";
-      comentario = "Se permite a los propietarios de los grupos añadir miembros externos a la organización. Esto descentraliza la autoridad de federación y eleva críticamente el riesgo de fuga de información o espionaje accidental, permitiendo que usuarios locales agreguen correos de consumo personal (@gmail.com, @yahoo.com) a listas de distribución altamente sensibles.";
+      comentario = "Se permite a los propietarios de los grupos añadir miembros externos a la organización.";
     } else if (extractedValue === false) {
-      respuestaConcreta = "Desactivado";
+      respuestaConcreta = "Deshabilitado";
       riesgo = "Bajo";
-      comentario = "La capacidad de los propietarios para agregar miembros externos está bloqueada. Esto centraliza la autoridad de federación en los administradores del entorno y neutraliza el riesgo de que empleados agreguen cuentas ajenas a la organización a canales de comunicación interna.";
+      comentario = "La capacidad de los propietarios para agregar miembros externos está bloqueada.";
     } else {
       // Comportamiento por defecto seguro si la API no reporta políticas explícitas
-      respuestaConcreta = "Desactivado";
+      respuestaConcreta = "Deshabilitado por defecto ";
       riesgo = "Bajo";
-      comentario = "No se detectaron políticas explícitas en la API. El sistema aplica de forma predeterminada la política de restricción segura, bloqueando la adición de miembros externos por parte de usuarios finales.";
+      comentario = "El sistema aplica de forma predeterminada la política de restricción segura, bloqueando la adición de miembros externos por parte de usuarios finales.";
     }
 
     Logger.log(`[LOG] Groups Owners Allow External Members Audit: Resultado -> ${respuestaConcreta} | Riesgo: ${riesgo} | Extracted: ${extractedValue}`);

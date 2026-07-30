@@ -137,16 +137,16 @@ class GoogleTakeoutStatusStrategy extends ApiStrategy {
     if (extractedTakeoutStatus === "ENABLED") {
       respuestaConcreta = "Activado";
       riesgo = "Alto";
-      comentario = "La descarga masiva mediante Google Takeout está habilitada. Esto elude por completo las reglas tradicionales de Prevención de Pérdida de Datos (DLP) corporativas en tránsito y las líneas base de seguridad de CISA (GWS.COMMONCONTROLS.12.1v1), facilitando la exfiltración masiva de todos los datos de la cuenta (Drive, Gmail, Chat) hacia repositorios locales fuera del control institucional.";
+      comentario = "La descarga masiva mediante Google Takeout está habilitada.";
     } else if (extractedTakeoutStatus === "DISABLED") {
       respuestaConcreta = "Desactivado";
       riesgo = "Bajo";
-      comentario = "Google Takeout se encuentra completamente deshabilitado. Esta configuración mitiga con éxito el vector de exfiltración masiva de datos en bloque, garantizando que la información corporativa permanezca bajo la custodia, retención y auditoría estricta del inquilino.";
+      comentario = "Google Takeout se encuentra completamente deshabilitado. Esta configuración mitiga con éxito el vector de exfiltración masiva de datos en bloque.";
     } else {
       // Manejo del comportamiento por defecto (Google mantiene Takeout ENABLED de forma nativa si no hay restricción)
       respuestaConcreta = "Activado por defecto";
       riesgo = "Alto";
-      comentario = "No se localizaron políticas explícitas en la API de Cloud Identity para esta unidad organizativa. Google Workspace aplica el comportamiento heredado permisivo por defecto, manteniendo la herramienta activa y dejando expuesta la superficie corporativa ante descargas locales masivas de perfiles.";
+      comentario = "No se detectaron políticas explícitas en la consola de admin.";
     }
 
     Logger.log(`[LOG] Google Takeout Core Status Audit: Resultado -> ${respuestaConcreta} | Riesgo: ${riesgo} | Extracted: ${extractedTakeoutStatus}`);

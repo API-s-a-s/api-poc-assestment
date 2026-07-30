@@ -131,18 +131,18 @@ class ChatAllowExternalChatsStrategy extends ApiStrategy {
 
     // Evaluación estricta del interruptor maestro perimetral
     if (extractedAllowExternal === false) {
-      respuestaConcreta = "Desactivado (Hard Block)";
+      respuestaConcreta = "Deshabilitado";
       riesgo = "Bajo";
-      comentario = "Los chats con usuarios externos a la organización están completamente deshabilitados. Esta restricción actúa como una barrera infranqueable que neutraliza de raíz los vectores de Spear Phishing efímeros y la exfiltración involuntaria de datos a través de canales de mensajería instantánea.";
+      comentario = "Los chats con usuarios externos a la organización están completamente deshabilitados.";
     } else if (extractedAllowExternal === true) {
-      respuestaConcreta = "Activado";
+      respuestaConcreta = "Habilitado";
       riesgo = "Alto";
-      comentario = "Se permite a los usuarios iniciar y recibir chats con cuentas externas al dominio de confianza. Esto expande significativamente la superficie de exposición ante ataques de ingeniería social y exfiltración de información sensible, requiriendo de forma obligatoria la validación de controles compensatorios (como advertencias visuales del ítem ID-134).";
+      comentario = "Se permite a los usuarios iniciar y recibir chats con cuentas externas al dominio de confianza.";
     } else {
       // Comportamiento predeterminado permisivo si la API viene vacía
-      respuestaConcreta = "Activado";
+      respuestaConcreta = "Habilitado por defecto";
       riesgo = "Alto";
-      comentario = "No se detectaron políticas explícitas en la API de Cloud Identity para esta OU. El sistema hereda el comportamiento nativo permisivo de Google Workspace, permitiendo interacciones de chat externo sin un bloqueo duro perimetral.";
+      comentario = "El sistema hereda el comportamiento nativo permisivo de Google Workspace, permitiendo interacciones de chat externo sin un bloqueo duro perimetral.";
     }
 
     Logger.log(`[LOG] Chat Allow External Chats Audit: Resultado -> ${respuestaConcreta} | Riesgo: ${riesgo} | Extracted: ${extractedAllowExternal}`);

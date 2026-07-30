@@ -144,20 +144,20 @@ class ChatExternalWarningStrategy extends ApiStrategy {
     } else if (extractedAllowExternal === true || extractedAllowExternal === null) {
       // Si el chat externo está permitido, evaluamos obligatoriamente las advertencias visuales
       if (extractedWarnExternal === false) {
-        respuestaConcreta = "Chat externo activo (Sin advertencias visuales)";
+        respuestaConcreta = "Chat externo habilitado | advertencias deshabilitadas";
         riesgo = "Alto";
-        comentario = "Se permite la comunicación con usuarios externos, pero se han desactivado las advertencias visuales y banners en la interfaz. Esto incrementa críticamente el riesgo de fraude de suplantación ejecutiva (CEO Fraud), dado que los empleados no recibirán alertas proactivas si interactúan con una identidad externa maliciosa utilizando el mismo nombre de un directivo interno.";
+        comentario = "Se permite la comunicación con usuarios externos, pero se han desactivado las advertencias visuales y banners en la interfaz.";
       } else {
         // Escenario seguro alternativo: Chat permitido pero con alertas de control compensatorio activadas
-        respuestaConcreta = "Chat externo activo con advertencias visuales";
+        respuestaConcreta = "Habilitado";
         riesgo = "Bajo";
-        comentario = "El chat con dominios externos está permitido debido a requerimientos comerciales, pero se aplican controles compensatorios estrictos. La interfaz de usuario emitirá alertas visuales y banners explícitos al iniciar hilos con personas ajenas a la organización, mitigando ataques de ingeniería social.";
+        comentario = "El chat con dominios externos está permitido pero se aplican controles compensatorios estrictos.";
       }
     } else {
       // Comportamiento seguro por defecto de Google Workspace
-      respuestaConcreta = "Advertencias activas (Valor por defecto)";
+      respuestaConcreta = "Habilitadas por defecto";
       riesgo = "Bajo";
-      comentario = "No se localizaron políticas explícitas en la API de Cloud Identity. El sistema aplica de forma nativa la configuración recomendada de Google Workspace, manteniendo activos los indicadores de presencia externa y banners de advertencia para proteger la identidad institucional.";
+      comentario = "El sistema aplica la configuración manteniendo activos los indicadores de presencia externa y banners de advertencia para proteger la identidad institucional.";
     }
 
     Logger.log(`[LOG] Chat External Interaction Warnings Audit: Resultado -> ${respuestaConcreta} | Riesgo: ${riesgo} | Allow: ${extractedAllowExternal} | Warn: ${extractedWarnExternal}`);

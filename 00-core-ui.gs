@@ -12,7 +12,7 @@ function onOpen() {
       .addItem('🧩 Ejecutar análisis de integración de apps', 'AuditoriasAppsExternas')
       .addItem('🧩 Ejecutar análisis de email y DNS', 'AuditoriasEmail')
       .addItem('🧩 Ejecutar análisis de Drive', 'AuditoriaDrive')
-      .addItem('🧩 Ejecutar análisis de Servicios Adicionales', 'AuditoriaServiciosAdicionales')
+      .addItem('🧩 Ejecutar análisis de servicios adicionales', 'AuditoriaServiciosAdicionales')
       .addItem('🧩 Ejecutar análisis de gestión de dispositivos', 'AuditoriaGestionDispositivos')
       .addItem('🧩 Ejecutar análisis de gestión de navegadores', 'AuditoriaGestionNavegador')      
       .addItem('🧩 Ejecutar análisis de preparar y supervisar', 'AuditoriaPrepararSupervisar')

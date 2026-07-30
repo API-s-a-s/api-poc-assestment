@@ -139,22 +139,22 @@ class SitesDriveExternalSharingStrategy extends ApiStrategy {
 
     // Evaluación cruzada de variables (Enum + Booleano)
     if (extractedPublishing === true) {
-      respuestaConcreta = `Publicación Permitida (${extractedSharingMode || "ON"})`;
+      respuestaConcreta = `Habilitado)`;
       riesgo = "Alto";
-      comentario = "Debido a que Google Sites se gestiona de forma nativa en la infraestructura de Drive, permitir la publicación de archivos habilita que los sitios sean indizados por motores de búsqueda públicos sin requerir autenticación corporativa. Esto expone a la organización a que entidades maliciosas generen portales de phishing bajo un dominio de alta reputación.";
+      comentario = "Google Sites se permite la publicación de archivos en los sitios sean indizados por motores de búsqueda.";
     } else if (extractedSharingMode === "OFF") {
-      respuestaConcreta = "Uso compartido externo desactivado";
+      respuestaConcreta = "compartir con externo deshabilitado";
       riesgo = "Bajo";
-      comentario = "El intercambio externo y la publicación de archivos de Drive (incluidos Google Sites) están completamente bloqueados. Los sitios web creados solo pueden ser visualizados por miembros autenticados del inquilino, garantizando un perímetro estricto.";
+      comentario = "El intercambio externo y la publicación de archivos de Google Sites están completamente bloqueados.";
     } else if (extractedPublishing === false) {
-      respuestaConcreta = `Compartición Externa Activa / Publicación Bloqueada`;
+      respuestaConcreta = `Compartir con externa habilitado / Publicación deshabilitada`;
       riesgo = "Medio";
-      comentario = "Se permite compartir archivos con usuarios externos específicos, pero la capacidad de publicar Google Sites de manera abierta hacia internet sin autenticación está bloqueada de forma segura. Mitiga la indización en motores de búsqueda.";
+      comentario = "Se permite compartir archivos con usuarios externos específicos, pero la capacidad de publicar Google Sites de manera abierta hacia internet sin autenticación está bloqueada de forma segura.";
     } else {
       // Manejo de valores por defecto o indefinidos
-      respuestaConcreta = "Revisión manual / Por defecto";
-      riesgo = "Medio";
-      comentario = "No se detectaron políticas explícitas en la API de Cloud Identity para el control de intercambio perimetral de Drive. Se recomienda verificar directamente la consola de administración en la sección de Drive y Docs > Opciones de uso compartido.";
+      respuestaConcreta = "Revisión manual";
+      riesgo = "";
+      comentario = "No se detectaron políticas explícitas en la API de Cloud Identity para el control de intercambio perimetral de Drive.";
     }
 
     Logger.log(`[LOG] Sites Drive External Sharing Audit: Resultado -> ${respuestaConcreta} | Riesgo: ${riesgo} | Mode: ${extractedSharingMode} | Pub: ${extractedPublishing}`);

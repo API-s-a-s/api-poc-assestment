@@ -44,15 +44,6 @@ class GroupsViewTopicsDefaultAccessStrategy extends ApiStrategy {
     
     Logger.log(`[ID-125] Se encontraron ${targetPolicies.length} políticas en memoria mediante filtro .endsWith()`);
     
-    // LOG DE CONTROL: Si vino vacío en memoria, listamos qué hay de 'groups' disponible
-    if (targetPolicies.length === 0) {
-      const groupsTypes = policies
-        .map(p => p.setting && p.setting.type)
-        .filter(t => t && t.toLowerCase().includes("groups"));
-      Logger.log(`[DEBUG ID-125] [ALERT] Filtro en memoria vacío. Mapeo de tipos relacionados con 'groups' existentes: ${JSON.stringify(groupsTypes)}`);
-    }
-    
-    // Fallback híbrido: si no está en el bulk, consultar directamente a la API de Google
     if (targetPolicies.length === 0 && auth) {
       Logger.log(`[ID-125] [WARNING] La API masiva no trajo la configuración. Iniciando consulta directa a la API...`);
       try {
@@ -64,9 +55,6 @@ class GroupsViewTopicsDefaultAccessStrategy extends ApiStrategy {
         const filter = `customer=="customers/${this.customerId}" && setting.type.matches(".*groups_for_business.groups_sharing.*")`;
         const url = `https://cloudidentity.googleapis.com/v1/policies?filter=${encodeURIComponent(filter)}&t=${new Date().getTime()}`;
 
-        Logger.log(`[DEBUG ID-125] URL Generada para API: ${url}`);
-        Logger.log(`[DEBUG ID-125] Filtro estructurado enviado: ${filter}`);
-
         const options = {
           method: "get",
           headers: { ...privilegedHeader, "Cache-Control": "no-cache" },
@@ -74,34 +62,13 @@ class GroupsViewTopicsDefaultAccessStrategy extends ApiStrategy {
         };
 
         const response = this.fetchWithBackoff(url, options);
-        const responseText = response.getContentText();
-        
-        // LOG EXPLICITO: Imprimir exactamente el RAW que responde Google
-        Logger.log(`[DEBUG ID-125] RESPUESTA RAW DIRECTA DE GOOGLE: ${responseText}`);
-
-        const json = JSON.parse(responseText);
-        
-        if (json.error) {
-          Logger.log(`[DEBUG ID-125] [ERROR API] Google denegó o falló la petición: ${JSON.stringify(json.error)}`);
-        }
-
+        const json = JSON.parse(response.getContentText());
         targetPolicies = json.policies || [];
-        Logger.log(`[ID-125] [SUCCESS] API directa parseada exitosamente. Políticas recuperadas: ${targetPolicies.length}`);
       } catch (e) {
         Logger.log(`[ID-125] Error crítico en transporte HTTP directo: ${e.message}`);
       }
     }
 
-    if (targetPolicies.length > 0) {
-      Logger.log(`[ID-125] Metadatos de políticas encontradas: ` + 
-        JSON.stringify(targetPolicies.map(p => ({ 
-          type: p.setting?.type, 
-          name: p.name, 
-          orgUnit: p.policyQuery?.orgUnit 
-        })))
-      );
-    }
-    
     let extractedValue = null;
     let rawData = null;
 
@@ -109,14 +76,8 @@ class GroupsViewTopicsDefaultAccessStrategy extends ApiStrategy {
       const rootPolicy = PolicyReducerFactory.getEffectiveRootPolicy(targetPolicies, "groups_for_business.groups_sharing");
       if (rootPolicy && rootPolicy.setting) {
         rawData = rootPolicy;
-        
-        // LOG EXPLICITO: Ver la anatomía interna del nodo de configuración de Google Groups
-        Logger.log(`[DEBUG ID-125] Nodo rootPolicy.setting completo: ${JSON.stringify(rootPolicy.setting)}`);
-
         const valueNode = rootPolicy.setting.value || rootPolicy.setting;
-        Logger.log(`[DEBUG ID-125] Estructura interna de valueNode: ${JSON.stringify(valueNode)}`);
-        
-        // Verificación resiliente de la variable estricta
+
         if (valueNode.viewTopicsDefaultAccessLevel !== undefined) {
           extractedValue = valueNode.viewTopicsDefaultAccessLevel;
         } else if (valueNode.view_topics_default_access_level !== undefined) {
@@ -129,26 +90,43 @@ class GroupsViewTopicsDefaultAccessStrategy extends ApiStrategy {
 
     let respuestaConcreta, riesgo, comentario;
 
-    // Evaluación del Enum de visibilidad perimetral (viewTopicsDefaultAccessLevel)
-    if (extractedValue === "ANYONE_IN_THE_WORLD" || extractedValue === "ANYONE_CAN_VIEW") {
+    // Mapeo exhaustivo de Enums de visibilidad perimetral de Cloud Identity Policy API
+    if (
+      extractedValue === "ANYONE_IN_THE_WORLD" || 
+      extractedValue === "ANYONE_CAN_VIEW" || 
+      extractedValue === "PUBLIC"
+    ) {
       respuestaConcreta = "Cualquiera en internet";
       riesgo = "Alto";
       comentario = "La configuración predeterminada permite que cualquier usuario en internet vea los temas, debates e hilos de discusión de los grupos de la organización. Esto representa una fuga crítica de información institucional y de propiedad intelectual.";
-    } else if (extractedValue === "ALL_YOUR_ORGANIZATION_MEMBERS" || extractedValue === "ALL_IN_DOMAIN_CAN_VIEW") {
+    } else if (
+      extractedValue === "DOMAIN_USERS" || 
+      extractedValue === "ALL_YOUR_ORGANIZATION_MEMBERS" || 
+      extractedValue === "ALL_IN_DOMAIN_CAN_VIEW"
+    ) {
       respuestaConcreta = "Todos los miembros de la organización";
       riesgo = "Medio";
       comentario = "Cualquier empleado o miembro del dominio puede ver por defecto los temas y discusiones de cualquier grupo creado. Aunque el perímetro es interno, incrementa el riesgo de exposición de datos sensibles entre departamentos no autorizados.";
-    } else if (extractedValue === "ALL_GROUP_MEMBERS" || extractedValue === "ALL_MEMBERS_CAN_VIEW") {
+    } else if (
+      extractedValue === "ALL_GROUP_MEMBERS" || 
+      extractedValue === "ALL_MEMBERS_CAN_VIEW" || 
+      extractedValue === "MEMBER" || 
+      extractedValue === "MEMBERS_ONLY"
+    ) {
       respuestaConcreta = "Solo miembros del grupo";
       riesgo = "Bajo";
-      comentario = "La visibilidad por defecto de los temas está restringida exclusivamente a los integrantes aprobados de cada grupo, garantizando el aislamiento de la información y el principio de menor privilegio.";
-    } else if (extractedValue === "ALL_MANAGERS_CAN_VIEW") {
+      comentario = "La visibilidad por defecto de los temas está restricted exclusivamente a los integrantes aprobados de cada grupo, garantizando el aislamiento de la información y el principio de menor privilegio.";
+    } else if (
+      extractedValue === "ALL_MANAGERS_CAN_VIEW" || 
+      extractedValue === "MANAGERS_ONLY" || 
+      extractedValue === "OWNERS_AND_MANAGERS"
+    ) {
       respuestaConcreta = "Solo administradores del grupo";
       riesgo = "Bajo";
       comentario = "Acceso altamente restringido. Por defecto, solo los gerentes o administradores del grupo pueden ver el contenido de los temas y discusiones.";
     } else {
-      // Manejo de valores nulos o herencia segura de Google
-      respuestaConcreta = "Solo miembros";
+      // Si viniera vacío o nulo de fábrica
+      respuestaConcreta = "Solo miembros del grupo";
       riesgo = "Bajo";
       comentario = "Google Workspace aplica el comportamiento predeterminado seguro del sistema, aislando las discusiones de los grupos únicamente a sus miembros.";
     }

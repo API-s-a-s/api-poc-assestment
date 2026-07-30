@@ -139,22 +139,22 @@ class ChatHistorySettingsStrategy extends ApiStrategy {
 
     // Evaluación cruzada de variables según alineación de seguridad eDiscovery y CISA
     if (extractedHistoryOn === true && extractedUserModification === false) {
-      respuestaConcreta = "Historial Forzado (Activado / No modificable)";
+      respuestaConcreta = "Habilitado | No modificable";
       riesgo = "Bajo";
-      comentario = "El historial de chat está configurado de forma segura: activo por defecto y sin permisos de modificación para el usuario. Cumple con los estándares de retención de datos para eDiscovery e impide que un atacante borre la evidencia forense tras un incidente de exfiltración o phishing.";
+      comentario = "El historial de chat está configurado de forma segura y sin permisos de modificación para el usuario que impide que un atacante borre la evidencia forense tras un incidente de exfiltración o phishing.";
     } else if (extractedHistoryOn === true && extractedUserModification === true) {
-      respuestaConcreta = "Historial Activo (Modificable por el usuario)";
+      respuestaConcreta = "Habilitado | Modificable";
       riesgo = "Medio";
-      comentario = "El historial está encendido inicialmente, pero se permite que los usuarios lo apaguen de forma discrecional. Esto debilita la postura probatoria del dominio, permitiendo que hilos de conversación altamente sensibles sean eliminados u ocultados voluntariamente.";
+      comentario = "El historial está encendido pero se permite que los usuarios lo apaguen de forma discrecional.";
     } else if (extractedHistoryOn === false) {
-      respuestaConcreta = extractedUserModification ? "Historial Apagado (Modificable)" : "Historial Apagado Forzado";
+      respuestaConcreta = extractedUserModification ? "Deshabilitado" : "No modificable";
       riesgo = "Alto";
-      comentario = "El historial de las conversaciones se encuentra desactivado por defecto. Esta configuración destruye las capacidades de eDiscovery y auditoría en tiempo real del inquilino, facilitando ataques internos efímeros sin dejar registro de actividad en la plataforma.";
+      comentario = "El historial de las conversaciones se encuentra desactivado por defecto, facilita ataques internos efímeros sin dejar registro de actividad en la plataforma.";
     } else {
       // Manejo de valores por defecto seguros de Google
       respuestaConcreta = "Revisión manual / Por defecto";
-      riesgo = "Medio";
-      comentario = "No se detectaron directivas explícitas de Cloud Identity para la retención histórica del chat. Se recomienda revisar manualmente la consola en Google Chat > Configuración de Chat para verificar que las directivas heredadas cumplan con el marco probatorio organizacional.";
+      riesgo = "";
+      comentario = "No se detectaron directivas explícitas de la api del chat.";
     }
 
     Logger.log(`[LOG] Chat History and Retention Audit: Resultado -> ${respuestaConcreta} | Riesgo: ${riesgo} | HistoryOn: ${extractedHistoryOn} | UserMod: ${extractedUserModification}`);
