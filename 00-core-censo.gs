@@ -215,8 +215,48 @@ class CensusStateWrapper {
 
   _buildGroupsHashMap(customerId) {
     const map = {};
-    // Simulador de abstracción de red masiva para mapeo en RAM. 
-    // En producción, iterar sobre grupos y members list, y poblar el diccionario.
+    try {
+      let pageToken = null;
+      const allGroups = [];
+      do {
+        const response = AdminDirectory.Groups.list({ customer: customerId, maxResults: 200, pageToken: pageToken });
+        const groups = response.groups || [];
+        allGroups.push(...groups);
+        pageToken = response.nextPageToken;
+      } while (pageToken);
+
+      Logger.log(`[CENSO GRUPOS] Se encontraron ${allGroups.length} grupos en el dominio.`);
+
+      for (const group of allGroups) {
+        let memberPageToken = null;
+        do {
+          try {
+            const membersResponse = AdminDirectory.Members.list(group.id, { maxResults: 200, pageToken: memberPageToken });
+            const members = membersResponse.members || [];
+
+            for (const member of members) {
+              const memberEmail = member.email ? member.email.toLowerCase() : null;
+              if (memberEmail) {
+                if (!map[memberEmail]) map[memberEmail] = [];
+                // Guardar tanto el ID numérico/alfanumérico como el email del grupo para coincidir con CEL
+                if (group.id && !map[memberEmail].includes(group.id)) {
+                  map[memberEmail].push(group.id);
+                }
+                if (group.email && !map[memberEmail].includes(group.email)) {
+                  map[memberEmail].push(group.email);
+                }
+              }
+            }
+            memberPageToken = membersResponse.nextPageToken;
+          } catch (errMember) {
+            Logger.log(`[WARN GRUPOS] No se pudieron obtener miembros del grupo ${group.email || group.id}: ${errMember.message}`);
+            memberPageToken = null;
+          }
+        } while (memberPageToken);
+      }
+    } catch (e) {
+      Logger.log(`[ERROR CENSO GRUPOS] Fallo al extraer grupos globales: ${e.message}`);
+    }
     return map;
   }
 

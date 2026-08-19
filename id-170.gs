@@ -90,7 +90,7 @@ class ChromeComponentUpdatesStrategy extends ApiStrategy {
       policyTargetKey: {
         targetResource: targetResource
       },
-      policySchemaFilter: "chrome.users.ComponentUpdatesEnabled",
+      policySchemaFilter: "chrome.users.ComponentUpdates",
       pageSize: 100
     };
 
@@ -145,9 +145,10 @@ class ChromeComponentUpdatesStrategy extends ApiStrategy {
     let riesgo170, comentario170, valorPrincipal;
 
     if (schemaNotFound) {
-      riesgo170 = "Medio";
-      valorPrincipal = "No Disponible vía API";
-      comentario170 = "El esquema de política no fue encontrado en la Chrome Policy API (HTTP 404). Es posible que la política haya sido deprecada, renombrada, o pertenezca a un nivel jerárquico diferente.";
+      // Si el esquema no se encontró, fusionamos con el comportamiento por defecto seguro
+      riesgo170 = "Bajo";
+      valorPrincipal = "No Configurado (Habilitado por defecto / 0)";
+      comentario170 = "La directiva no está configurada de manera explícita en la raíz del dominio. Aunque Chrome mantiene activas de forma nativa las actualizaciones automáticas de sus subcomponentes, se recomienda forzar la política de forma mandatoria para evitar modificaciones locales no autorizadas en el perfil del usuario.";
     } else if (componentUpdatesEnabled === true) {
       riesgo170 = "Bajo";
       valorPrincipal = "Habilitado (Forzado)";

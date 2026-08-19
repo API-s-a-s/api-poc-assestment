@@ -2,6 +2,7 @@
  * Se encarga de proveer y gestionar la identidad, permisos y tokens de acceso.
  * Centraliza el token interactivo y el token DWD.
  * Referencia: Google Cloud IAM & DWD (https://developers.google.com/workspace/guides/create-credentials)
+ * https://docs.cloud.google.com/docs/authentication/token-types
  */
 class AuthService {
   constructor() {

@@ -119,18 +119,18 @@ class AppleDeviceEnrollmentStrategy extends ApiStrategy {
     if (totalDevices === 0) {
       riesgo146 = "Medio"; 
       valorPrincipal = "Sin dispositivos";
-      comentario146 = "No se encontraron dispositivos registrados y no es posible verificar la integración con Apple Business Manager (ABM) o Device Enrollment Program (DEP).";
+      comentario146 = "No se encontraron dispositivos registrados y no es posible verificar la integración con Apple Business Manager.";
     } else {
       valorPrincipal = `${companyOwnedCount} corporativos y ${byodCount} personales:`;
       
       if (companyOwnedCount > 0) {
         // Existen dispositivos propiedad de la empresa (COMPANY_OWNED), lo que implica sincronización de inventario.
         riesgo146 = "Bajo";
-        comentario146 = `Excelente postura. Se identificaron ${companyOwnedCount} dispositivos marcados con propiedad corporativa (COMPANY_OWNED). Esto confirma que existe una sincronización de inventario activa (ej. a través de ABM/DEP o Zero-Touch) forzando controles de MDM institucionales.`;
+        comentario146 = `Se identificaron ${companyOwnedCount} dispositivos marcados con propiedad corporativa.`;
       } else {
         // Todo es BYOD o no especificado.
         riesgo146 = "Medio";
-        comentario146 = `ATENCIÓN: Se analizaron ${totalDevices} dispositivos, pero ninguno posee el atributo 'COMPANY_OWNED' (inventario corporativo irrenunciable). Actualmente el entorno depende únicamente de inscripciones BYOD (${byodCount}) o no especificadas (${unspecifiedCount}), reduciendo la obligatoriedad del MDM ante borrados de fábrica.`;
+        comentario146 = `Se analizaron ${totalDevices} dispositivos, pero ninguno posee el atributo marcados con propiedad corporativa. Todo el entorno depende de inscripciones BYOD (${byodCount}) o no especificadas (${unspecifiedCount}`;
       }
     }
 

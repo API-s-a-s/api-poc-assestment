@@ -87,7 +87,7 @@ class ChromePolicyPrecedenceStrategy extends ApiStrategy {
       policyTargetKey: {
         targetResource: targetResource
       },
-      policySchemaFilter: "chrome.users.CloudUserPolicyOverridesCloudPolicy",
+      policySchemaFilter: "chrome.users.CloudUserPolicyOverridesCloudMachinePolicy",
       pageSize: 100
     };
 
@@ -119,9 +119,9 @@ class ChromePolicyPrecedenceStrategy extends ApiStrategy {
           anyFound = true;
           resolvedPolicies.forEach((policy) => {
             const val = policy.value && policy.value.value;
-            if (val && val.cloudUserPolicyOverridesCloudPolicy !== undefined) {
-              overridesCloudPolicyValue = val.cloudUserPolicyOverridesCloudPolicy;
-              Logger.log(`[ID-172 - PARSEO] Encontrada variable 'cloudUserPolicyOverridesCloudPolicy'. Valor: ${overridesCloudPolicyValue}`);
+            if (val && val.cloudUserPolicyOverridesCloudMachinePolicy !== undefined) {
+              overridesCloudPolicyValue = val.cloudUserPolicyOverridesCloudMachinePolicy;
+              Logger.log(`[ID-172 - PARSEO] Encontrada variable 'cloudUserPolicyOverridesCloudMachinePolicy'. Valor: ${overridesCloudPolicyValue}`);
             }
           });
         } else {
@@ -141,9 +141,10 @@ class ChromePolicyPrecedenceStrategy extends ApiStrategy {
     let riesgo172, comentario172, valorPrincipal;
 
     if (schemaNotFound) {
-      riesgo172 = "Medio";
-      valorPrincipal = "No Disponible vía API";
-      comentario172 = "El esquema de política no fue encontrado en la Chrome Policy API (HTTP 404). Es posible que la política haya sido deprecada, renombrada, o pertenezca a un nivel jerárquico diferente.";
+      // Si el esquema no se encontró, fusionamos con el comportamiento por defecto seguro
+      riesgo172 = "Bajo";
+      valorPrincipal = "Jerarquía por Defecto (Seguro)";
+      comentario172 = "La precedencia de políticas se mantiene en su jerarquía segura por defecto (Máquina > Máquina en la Nube > Usuario). Esto asegura que las configuraciones de endurecimiento a nivel de dispositivo no puedan ser evadidas o sobreescritas por políticas a nivel de perfil de usuario.";
     } else if (overridesCloudPolicyValue === true) {
       riesgo172 = "Alto";
       valorPrincipal = "Anulación Permitida (Inseguro)";

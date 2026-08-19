@@ -83,11 +83,12 @@ class UnmanagedAppsDataSharingStrategy extends ApiStrategy {
     let valorPrincipal = externalSharingMode;
 
     if (externalSharingMode === "ALLOWED") {
+      valorPrincipal = "Habilitado";
       riesgo157 = "Alto";
-      comentario157 = "El intercambio de datos está configurado como 'ALLOWED'. Esto permite que los datos corporativos fluyan hacia el espacio personal del usuario, lo que representa un riesgo crítico de fuga o exfiltración de información institucional.";
+      comentario157 = "El intercambio de datos está habilitado. Esto permite que los datos corporativos fluyan hacia el espacio personal del usuario";
     } else {
       riesgo157 = "Bajo";
-      comentario157 = `El intercambio de datos se encuentra restringido (${externalSharingMode}). Las restricciones nativas aseguran que el contenido descargado solo pueda abrirse en otras aplicaciones aprobadas por la empresa.`;
+      comentario157 = `El intercambio de datos se encuentra restringido ${externalSharingMode}, que aseguran que el contenido descargado solo pueda abrirse en apps aprobadas por la empresa.`;
     }
 
     return {

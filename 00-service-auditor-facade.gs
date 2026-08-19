@@ -23,6 +23,12 @@ class SecurityAuditorFacade {
       try {
         let parsedRes;
 
+        // Inyección universal de authHeader: permite que estrategias híbridas
+        // (evaluateInMemory con fallback de red) puedan usar fetchWithBackoff/fetchPaginated.
+        if (typeof s.setAuthHeader === 'function') {
+          s.setAuthHeader(authHeader);
+        }
+
         if (typeof s.evaluateInMemory === 'function') {
           Logger.log(`[FACADE] Ejecutando estrategia en memoria: ${s.name}`);
           parsedRes = s.evaluateInMemory(this.globalContext);
@@ -36,9 +42,6 @@ class SecurityAuditorFacade {
             "Pragma": "no-cache"
           };
 
-          if (typeof s.setAuthHeader === 'function') {
-            s.setAuthHeader(config.headers);
-          }
           config.url += (config.url.includes("?") ? "&" : "?") + "t=" + new Date().getTime();
           // La llamada de red se delega a fetchWithBackoff internamente en la estrategia,
           // o se asume manejada si el endpoint es estable.
@@ -49,7 +52,6 @@ class SecurityAuditorFacade {
         }
 
         resultados.push(parsedRes);
-        s.writeToSheet(parsedRes);        
 
       } catch (e) {
         Logger.log(`Error en ${s.name}: ${e.message}`);
