@@ -78,84 +78,111 @@ class ChromeSyncSettingsCbcmStrategy extends ApiStrategy {
 
     let syncTypeCbcmValue = null;
     let profileReauthPromptValue = null;
+    let syncDisabledValue = null;
+    let syncSettingsValue = null;
     let anyFound = false;
 
-    // 3. Preparar la llamada a la Chrome Policy API
+    // 3. Consultar múltiples esquemas relacionados con la sincronización de Chrome
+    //    La configuración de gestión para usuarios con sesión iniciada puede estar en:
+    //    - chrome.users.SyncSettingsCbcm: Configuración específica de CBCM (sincronización de perfiles)
+    //    - chrome.users.SyncDisabled: Toggle global que deshabilita toda sincronización
+    //    - chrome.users.SyncSettings: Configuración granular de qué tipos de datos sincronizar
     const url = `https://chromepolicy.googleapis.com/v1/customers/${this.customerId}/policies:resolve`;
-    const payload = {
-      policyTargetKey: {
-        targetResource: targetResource
-      },
-      policySchemaFilter: "chrome.users.SyncSettingsCbcm",
-      pageSize: 100
-    };
+    
+    const schemas = [
+      "chrome.users.SyncSettingsCbcm",
+      "chrome.users.SyncDisabled",
+      "chrome.users.SyncSettings"
+    ];
 
-    const options = {
-      method: "post",
-      headers: {
-        ...dwdHeader,
-        "Content-Type": "application/json",
-        "Cache-Control": "no-cache"
-      },
-      payload: JSON.stringify(payload),
-      muteHttpExceptions: true
-    };
+    for (const schema of schemas) {
+      const payload = {
+        policyTargetKey: {
+          targetResource: targetResource
+        },
+        policySchemaFilter: schema,
+        pageSize: 100
+      };
 
-    Logger.log("[ID-173] Solicitando política chrome.users.SyncSettingsCbcm...");
-    try {
-      const response = UrlFetchApp.fetch(url, options);
-      const code = response.getResponseCode();
-      const text = response.getContentText();
-      
-      Logger.log(`[ID-173 - DETALLE API] HTTP Code: ${code}`);
-      Logger.log(`[ID-173 - DETALLE API] RAW JSON: ${text}`);
+      const options = {
+        method: "post",
+        headers: {
+          ...dwdHeader,
+          "Content-Type": "application/json",
+          "Cache-Control": "no-cache"
+        },
+        payload: JSON.stringify(payload),
+        muteHttpExceptions: true
+      };
 
-      if (code === 200) {
-        const json = JSON.parse(text);
-        const resolvedPolicies = json.resolvedPolicies || [];
+      Logger.log(`[ID-173] Solicitando política ${schema}...`);
+      try {
+        const response = UrlFetchApp.fetch(url, options);
+        const code = response.getResponseCode();
+        const text = response.getContentText();
         
-        if (resolvedPolicies.length > 0) {
-          anyFound = true;
-          resolvedPolicies.forEach((policy) => {
-            const val = policy.value && policy.value.value;
-            if (val) {
-              if (val.syncTypeCbcm !== undefined) {
-                syncTypeCbcmValue = val.syncTypeCbcm;
+        Logger.log(`[ID-173 - DETALLE API] HTTP Code: ${code} para ${schema}`);
+        Logger.log(`[ID-173 - DETALLE API] RAW JSON: ${text}`);
+
+        if (code === 200) {
+          const json = JSON.parse(text);
+          const resolvedPolicies = json.resolvedPolicies || [];
+          
+          if (resolvedPolicies.length > 0) {
+            anyFound = true;
+            resolvedPolicies.forEach((policy) => {
+              const val = policy.value && policy.value.value;
+              if (val) {
+                // SyncSettingsCbcm
+                if (val.syncTypeCbcm !== undefined) {
+                  syncTypeCbcmValue = val.syncTypeCbcm;
+                  Logger.log(`[ID-173 - PARSEO] syncTypeCbcm: ${syncTypeCbcmValue}`);
+                }
+                if (val.profileReauthPrompt !== undefined) {
+                  profileReauthPromptValue = val.profileReauthPrompt;
+                  Logger.log(`[ID-173 - PARSEO] profileReauthPrompt: ${profileReauthPromptValue}`);
+                }
+                // SyncDisabled
+                if (val.syncDisabled !== undefined) {
+                  syncDisabledValue = val.syncDisabled;
+                  Logger.log(`[ID-173 - PARSEO] syncDisabled: ${syncDisabledValue}`);
+                }
+                // SyncSettings (puede tener syncDisabled dentro o tipos de sincronización)
+                if (val.syncDisabledDataTypes !== undefined) {
+                  syncSettingsValue = val.syncDisabledDataTypes;
+                  Logger.log(`[ID-173 - PARSEO] syncDisabledDataTypes: ${JSON.stringify(syncSettingsValue)}`);
+                }
               }
-              if (val.profileReauthPrompt !== undefined) {
-                profileReauthPromptValue = val.profileReauthPrompt;
-              }
-              Logger.log(`[ID-173 - PARSEO] Detectados en JSON -> syncTypeCbcm: ${syncTypeCbcmValue} | profileReauthPrompt: ${profileReauthPromptValue}`);
-            }
-          });
+            });
+          } else {
+            Logger.log(`[ID-173 - INFO] La API no devolvió configuraciones explícitas para ${schema}.`);
+          }
+        } else if (code === 404) {
+          Logger.log(`[ID-173 - WARN] Esquema ${schema} no encontrado (HTTP 404). Saltando...`);
         } else {
-          Logger.log("[ID-173 - INFO] La API no devolvió configuraciones explícitas en la raíz. Chrome aplicará los controles de sincronización de perfiles por defecto.");
+          Logger.log(`[ID-173 - ERROR] Petición fallida a la API con HTTP ${code} para ${schema}`);
         }
-      } else {
-        Logger.log(`[ID-173 - ERROR] Petición fallida a la API con HTTP ${code}`);
+      } catch (e) {
+        Logger.log(`[ID-173 - ERROR EXCEPCIÓN] Fallo de red al consultar ${schema}: ${e.message}`);
       }
-    } catch (e) {
-      Logger.log(`[ID-173 - ERROR EXCEPCIÓN] Fallo de red: ${e.message}`);
     }
 
     // 4. Lógica de Riesgos y Construcción de la Respuesta
-    // Valores conocidos observados en tus logs:
+    // Valores conocidos observados para syncTypeCbcm:
     // - "SYNC_TYPE_PROTO_ENUM_SYNC_CLOUD_DEFAULT_VALUE" (Uso nativo de la nube)
     // - "SYNC_TYPE_PROTO_ENUM_SYNC_DISABLED" (Sincronización explícitamente bloqueada)
+    // - "SYNC_TYPE_PROTO_ENUM_ROAMING_PROFILE_DISABLED_WITH_SYNC" (Perfil local con sync)
     
     let riesgo173, comentario173, valorPrincipal;
 
-    if (!anyFound || syncTypeCbcmValue === null) {
-      riesgo173 = "Medio";
-      valorPrincipal = "Sin Configurar (Hereda por defecto)";
-      comentario173 = "La Chrome Policy API respondió exitosamente sin encontrar configuración explícita para sincronización de perfiles (CBCM) en la OU raíz. Si bien Chrome asume la bajada básica de políticas, carecer de una directiva unificada impide asegurar controles granulares sobre los datos centralizados.";
-    } else {
+    // Caso 1: Se encontró información explícita de sincronización CBCM
+    if (syncTypeCbcmValue !== null) {
       const syncStr = syncTypeCbcmValue.toString();
 
       if (syncStr.includes("DISABLED")) {
         riesgo173 = "Alto";
         valorPrincipal = "Sincronización Deshabilitada";
-        comentario173 = "La sincronización basada en la nube (CBCM) está explícitamente DESACTIVADA. Los usuarios autenticados no sincronizarán marcadores, contraseñas autorizadas ni configuraciones corporativas uniformes, fragmentando los controles de auditoría del navegador.";
+        comentario173 = `La sincronización basada en la nube (CBCM) está explícitamente DESACTIVADA (${syncStr}). Los usuarios autenticados no sincronizarán marcadores, contraseñas autorizadas ni configuraciones corporativas uniformes, fragmentando los controles de auditoría del navegador.`;
       } else if (syncStr.includes("DEFAULT_VALUE") || syncStr.includes("ENABLED")) {
         riesgo173 = "Bajo";
         valorPrincipal = "Sincronización en la Nube Activa";
@@ -169,6 +196,30 @@ class ChromeSyncSettingsCbcmStrategy extends ApiStrategy {
         valorPrincipal = `Configuración Alternativa (${syncStr})`;
         comentario173 = `Se detectó un comportamiento personalizado para la sincronización de perfiles (${syncStr}). Se aconseja validar que esta directiva no esté interfiriendo con la correcta distribución de extensiones o políticas DLP.`;
       }
+    }
+    // Caso 2: Se encontró la flag SyncDisabled explícita
+    else if (syncDisabledValue !== null) {
+      if (syncDisabledValue === true) {
+        riesgo173 = "Alto";
+        valorPrincipal = "Sincronización Deshabilitada (SyncDisabled)";
+        comentario173 = "La sincronización de Chrome está explícitamente deshabilitada mediante la política SyncDisabled. Los perfiles de usuario no sincronizarán datos con la nube de Google, impidiendo la gestión centralizada de extensiones, marcadores y configuraciones corporativas.";
+      } else {
+        riesgo173 = "Bajo";
+        valorPrincipal = "Sincronización Habilitada (SyncDisabled=false)";
+        comentario173 = "La política SyncDisabled está explícitamente configurada como false, confirmando que la sincronización de Chrome está activa. Los perfiles de usuario sincronizarán datos con la nube de Google, permitiendo la gestión centralizada.";
+      }
+    }
+    // Caso 3: No se encontró ninguna política explícita en ninguno de los esquemas
+    else if (!anyFound) {
+      riesgo173 = "Bajo";
+      valorPrincipal = "Habilitado por defecto (Sin política explícita)";
+      comentario173 = "No se detectaron políticas explícitas de sincronización en la Chrome Policy API para la OU raíz (SyncSettingsCbcm, SyncDisabled, SyncSettings). Chrome aplica por defecto la gestión de perfiles de usuario con sesión iniciada, lo que permite la bajada básica de políticas y sincronización nativa. Si bien funciona correctamente, se recomienda configurar explícitamente la política para evitar modificaciones locales no autorizadas.";
+    }
+    // Caso 4: Se encontraron datos pero no las variables específicas esperadas
+    else {
+      riesgo173 = "Medio";
+      valorPrincipal = "Sin Configurar (Hereda por defecto)";
+      comentario173 = "La Chrome Policy API respondió exitosamente pero las variables específicas de sincronización (syncTypeCbcm, syncDisabled) no fueron encontradas en los datos devueltos. Chrome asumirá el comportamiento por defecto. Se recomienda revisar la configuración en la consola de administración.";
     }
 
     Logger.log(`[ID-173] Diagnóstico Terminado. syncType: ${syncTypeCbcmValue} | Riesgo: ${riesgo173}`);

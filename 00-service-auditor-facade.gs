@@ -3,10 +3,11 @@
  * Referencia Arquitectónica: Patrón de diseño Facade (https://refactoring.guru/es/design-patterns/facade)
  */
 class SecurityAuditorFacade {
-  constructor(authService, globalContext = null) {
+  constructor(authService, globalContext = null, errorCollector = null) {
     this.auth = authService;
     this.globalContext = globalContext; 
     this.strategies = [];
+    this.errorCollector = errorCollector;
   }
 
   addStrategy(strategy) {
@@ -51,10 +52,35 @@ class SecurityAuditorFacade {
           // ahora es responsabilidad exclusiva del adaptador de Exponential Backoff.
         }
 
+        // Inspección y registro en el colector de errores si está activo
+        if (this.errorCollector) {
+          if (!parsedRes) {
+            this.errorCollector.add(s.name, "EMPTY_RESPONSE", "La estrategia retornó un resultado nulo o vacío.");
+          } else {
+            const val = (parsedRes.valorPrincipal !== undefined && parsedRes.valorPrincipal !== null)
+              ? parsedRes.valorPrincipal.toString()
+              : "";
+            if (val.toUpperCase().includes("ERROR")) {
+              // Buscar comentarios de detalle asociados al error
+              let detalleError = val;
+              for (const key of Object.keys(parsedRes)) {
+                if (key.startsWith("comentario") && parsedRes[key]) {
+                  detalleError = parsedRes[key];
+                  break;
+                }
+              }
+              this.errorCollector.add(s.name, "API_ERROR", detalleError);
+            }
+          }
+        }
+
         resultados.push(parsedRes);
 
       } catch (e) {
         Logger.log(`Error en ${s.name}: ${e.message}`);
+        if (this.errorCollector) {
+          this.errorCollector.add(s.name, "EXCEPTION", e.stack || e.message);
+        }
       }      
     }
 

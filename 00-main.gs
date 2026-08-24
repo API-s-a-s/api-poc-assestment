@@ -52,7 +52,8 @@ function _ejecutarModuloAuditoria({
       : {};
       
     const globalContext = _crearContextoGlobalAuditoria(auth, customerId, extraContext);
-    const auditor = new SecurityAuditorFacade(auth, globalContext);
+    const errorCollector = new AuditErrorCollector();
+    const auditor = new SecurityAuditorFacade(auth, globalContext, errorCollector);
 
     const estrategias = estrategiasBuilder(auth, customerId, globalContext) || [];
     if (estrategias.length === 0) {
@@ -78,7 +79,15 @@ function _ejecutarModuloAuditoria({
     });
 
     generarResumenSemaforo();
-    ui.alert(`✅ ${mensajeExito}`);
+
+    // Consolidado y emisión de alertas por correo
+    if (errorCollector.hasErrors()) {
+      AlertService.sendErrorDigest(tituloModulo, errorCollector.getErrors());
+      Logger.log(errorCollector.getSummary());
+      ui.alert(`⚠️ ${mensajeExito}\n\nNota: Se detectaron ${errorCollector.getErrors().length} incidencias/errores en el módulo. Se ha enviado un consolidado detallado a jsuarez@apisas.com.`);
+    } else {
+      ui.alert(`✅ ${mensajeExito}`);
+    }
 
   } catch (error) {
     Logger.log(`Error en auditoría de ${tituloModulo}: ${error.stack || error.message}`);
@@ -364,6 +373,7 @@ function AuditoriaGestionNavegador() {
       new ChromeSafeBrowsingLevelStrategy(customerId),
       new ChromeDownloadRestrictionsStrategy(customerId),
       new ChromePasswordAlertStrategy(customerId),
+      new ChromeEndpointVerificationStrategy(customerId),
       new ChromeComponentUpdatesStrategy(customerId),
       new ChromeUpdatePolicyOverrideStrategy(customerId),
       new ChromePolicyPrecedenceStrategy(customerId),
