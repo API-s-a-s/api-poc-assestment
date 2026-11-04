@@ -369,15 +369,15 @@ function AuditoriaGestionNavegador() {
       new ChromeMachinePolicyStrategy(customerId),
       new ChromeBrowserSigninStrategy(customerId),
       new ChromePasswordManagerStrategy(customerId),
-      new ChromeRendererCodeIntegrityStrategy(customerId),
+      // new ChromeRendererCodeIntegrityStrategy(customerId),165
       new ChromeAdvancedProtectionStrategy(customerId),
       new ChromeSafeBrowsingLevelStrategy(customerId),
       new ChromeDownloadRestrictionsStrategy(customerId),
-      new ChromePasswordAlertStrategy(customerId),
-      new ChromeEndpointVerificationStrategy(customerId),
-      new ChromeComponentUpdatesStrategy(customerId),
+      // new ChromePasswordAlertStrategy(customerId), 169
+      // new ChromeEndpointVerificationStrategy(customerId), 162
+      // new ChromeComponentUpdatesStrategy(customerId), 170
       new ChromeUpdatePolicyOverrideStrategy(customerId),
-      new ChromePolicyPrecedenceStrategy(customerId),
+      // new ChromePolicyPrecedenceStrategy(customerId), 172
       new ChromeSyncSettingsCbcmStrategy(customerId)
     ]
   });
