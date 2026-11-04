@@ -83,7 +83,7 @@ class AlertService {
       return;
     }
 
-    const recipient = recipientOverride || "jsuarez@apisas.com";
+    const recipient = recipientOverride || "mmosquera@apisas.com";
     const timestampStr = Utilities.formatDate(new Date(), "America/Bogota", "yyyy-MM-dd HH:mm:ss");
     const subject = `[Auditoría API solutions] ${errors.length} errores en módulo "${moduleName}" — ${timestampStr}`;
 

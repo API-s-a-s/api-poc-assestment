@@ -11,7 +11,6 @@ class CELParserEngine {
    * @param {Object} user - Objeto del censo con los datos del empleado en RAM.
    * @return {boolean} Verdadero si la política aplica al usuario.
    */
-
   static evaluate(policy, user) {
     const q = (policy && policy.policyQuery && policy.policyQuery.query) ? policy.policyQuery.query : "";
 
@@ -34,58 +33,34 @@ class CELParserEngine {
       }
     }
 
-    // === SANITIZACIÓN CEL ===
-    // Eliminar paréntesis externos que envuelvan toda la expresión.
-    let sanitizedQ = q.trim();
-    if (sanitizedQ.startsWith("(") && sanitizedQ.endsWith(")")) {
-      // Solo eliminar si el paréntesis de apertura corresponde al de cierre final
-      let depth = 0;
-      let isWrapped = true;
-      for (let i = 0; i < sanitizedQ.length - 1; i++) {
-        if (sanitizedQ[i] === '(') depth++;
-        else if (sanitizedQ[i] === ')') depth--;
-        if (depth === 0) { isWrapped = false; break; }
-      }
-      if (isWrapped) {
-        sanitizedQ = sanitizedQ.substring(1, sanitizedQ.length - 1).trim();
-      }
-    }
+    // === SANITIZACIÓN CEL CON SOPORTE JERÁRQUICO DE PARÉNTESIS ===
+    let sanitizedQ = this._stripOuterParens(q);
 
-    // Advertencia QA: si después de la sanitización externa quedan paréntesis anidados,
-    // el split lineal no puede garantizar la precedencia lógica correcta.
-    // Omitimos la advertencia para reglas con "exists(" que usan funciones de forma estándar.
-    if ((sanitizedQ.includes("(") || sanitizedQ.includes(")")) && !sanitizedQ.includes("exists(")) {
-      Logger.log(`[WARN] Expresión CEL compleja no soportada al 100%: '${sanitizedQ}'. El parseo con split puede alterar la precedencia lógica.`);
-    }
-
-    // 1. FRAGMENTACIÓN DISYUNTIVA (Operador OR ||)
-    // Se divide la regla en bloques independientes. Basta con que uno sea verdadero.
-    const orSegments = sanitizedQ.split("||");
+    // 1. FRAGMENTACIÓN DISYUNTIVA (Operador OR ||) RESPETANDO PARÉNTESIS
+    const orSegments = this._tokenizeRespectingParens(sanitizedQ, "||");
     
     for (const orSeg of orSegments) {
-      // 2. CONJUNCIÓN RESTRICTIVA (Operador AND &&)
-      // Dentro de cada bloque OR, todas las subcondiciones deben ser verdaderas.
-      const andSegments = orSeg.split("&&");
+      // Limpiar paréntesis externos del segmento OR si existen
+      const cleanOrSeg = this._stripOuterParens(orSeg);
+
+      // 2. CONJUNCIÓN RESTRICTIVA (Operador AND &&) RESPETANDO PARÉNTESIS
+      const andSegments = this._tokenizeRespectingParens(cleanOrSeg, "&&");
       let andResult = true;
 
       for (const andSeg of andSegments) {
-         const condition = andSeg.trim();        
+         let condition = this._stripOuterParens(andSeg);        
+         
          // 3. INVERSIÓN UNARIA (Operador NOT !)
-         // Detecta si la condición viene negada para tratarla como una excepción.
          let isNegated = condition.startsWith("!");
          let coreCondition = condition;
          if (isNegated) {
-             coreCondition = condition.substring(1).trim();
-             // Si tras quitar el '!' queda envuelto en paréntesis, quitar los externos
-             if (coreCondition.startsWith("(") && coreCondition.endsWith(")")) {
-                 coreCondition = coreCondition.substring(1, coreCondition.length - 1).trim();
-             }
+             coreCondition = this._stripOuterParens(condition.substring(1).trim());
          }
          let conditionMatched = false;
 
          // --- EVALUACIÓN SEMÁNTICA EN RAM ---
          // Compara los datos del censo del usuario contra la regla analizada
-          if (coreCondition.includes("entity.org_units.exists")) {
+         if (coreCondition.includes("entity.org_units.exists")) {
              // Validación de Unidad Organizativa (OU)
              const ouMatches = this._extractArrayValues(coreCondition, "org_units");
              
@@ -116,7 +91,6 @@ class CELParserEngine {
             conditionMatched = groupMatches.some(gId => userGroups.includes(gId));
          } else if (coreCondition.includes("entity.licenses.exists")) {
             // Eliminación según el tipo de Licencias / SKUs corporativos
-            // EXTRAEMOS LA LÓGICA DE EXTRACCIÓN A UN MÉTODO MÁS ROBUSTO
             const licenseMatches = this._extractLicenses(coreCondition);
             const userLicenses = user.licenses || [];
             conditionMatched = licenseMatches.some(sku => userLicenses.includes(sku));
@@ -127,7 +101,6 @@ class CELParserEngine {
             }
          } else {
              // Zero Trust: si la regla CEL es desconocida, asumimos que el usuario NO califica.
-             // Evita dar acceso por defecto a vectores Zero Trust futuros no reconocidos.
              Logger.log(`[WARN CEL] Condición CEL no reconocida: '${coreCondition}'. Aplicando deny-by-default.`);
              conditionMatched = false; 
          }
@@ -160,6 +133,72 @@ class CELParserEngine {
          // Limpiamos el Set para la próxima ejecución
          this.discardedUsersLogs.clear();
      }
+  }
+
+  /**
+   * Elimina paréntesis exteriores redundantes envolviendo la expresión.
+   * @param {string} str - Cadena de expresión
+   * @return {string} Cadena desenrollada
+   */
+  static _stripOuterParens(str) {
+    let s = (str || "").trim();
+    while (s.startsWith("(") && s.endsWith(")")) {
+      let depth = 0;
+      let isWrapped = true;
+      for (let i = 0; i < s.length - 1; i++) {
+        if (s[i] === '(') depth++;
+        else if (s[i] === ')') depth--;
+        if (depth === 0) {
+          isWrapped = false;
+          break;
+        }
+      }
+      if (isWrapped) {
+        s = s.substring(1, s.length - 1).trim();
+      } else {
+        break;
+      }
+    }
+    return s;
+  }
+
+  /**
+   * Divide una expresión por un delimitador lógico (|| o &&) respetando
+   * la jerarquía de paréntesis y corchetes (depth === 0).
+   * @param {string} expr - Expresión CEL
+   * @param {string} delimiter - "||" o "&&"
+   * @return {string[]} Segmentos lógicos
+   */
+  static _tokenizeRespectingParens(expr, delimiter) {
+    const segments = [];
+    let depth = 0;
+    let current = "";
+    const dLen = delimiter.length;
+    const cleanExpr = (expr || "").trim();
+
+    for (let i = 0; i < cleanExpr.length; i++) {
+      const ch = cleanExpr[i];
+      if (ch === '(' || ch === '[') {
+        depth++;
+        current += ch;
+      } else if (ch === ')' || ch === ']') {
+        depth--;
+        current += ch;
+      } else if (depth === 0 && cleanExpr.substring(i, i + dLen) === delimiter) {
+        if (current.trim().length > 0) {
+          segments.push(current.trim());
+        }
+        current = "";
+        i += dLen - 1; // Avanzar el cursor por el delimitador
+      } else {
+        current += ch;
+      }
+    }
+
+    if (current.trim().length > 0) {
+      segments.push(current.trim());
+    }
+    return segments;
   }
 
   /**
@@ -303,19 +342,27 @@ class PolicyReducerFactory {
    * Reductor MAX: Selecciona la política con el sortOrder más alto.
    * Ref: https://cloud.google.com/identity/docs/concepts/policy-api-concepts#reducers_for_settings
    * sortOrder es un campo output-only real de la Policy API v1 (policyQuery.sortOrder).
-   * Cuando sortOrder no está disponible (ej. entorno mock), se aplica heurística de especificidad.
+   * Aplica validación estricta de tipo numérico (!isNaN y no nulo), soportando valores 0.0 o decrementados.
    */
   static _maxReducer(policies) {
     return policies.reduce((prev, current) => {
-      const prevOrder = parseFloat((prev.policyQuery && prev.policyQuery.sortOrder) || 0);
-      const currOrder = parseFloat((current.policyQuery && current.policyQuery.sortOrder) || 0);
+      const rawPrev = prev.policyQuery && prev.policyQuery.sortOrder;
+      const rawCurr = current.policyQuery && current.policyQuery.sortOrder;
+      const prevOrder = parseFloat(rawPrev);
+      const currOrder = parseFloat(rawCurr);
 
-      // Si al menos uno tiene sortOrder válido, usamos la comparación oficial (estrictamente mayor)
-      if (prevOrder !== 0 || currOrder !== 0) {
+      const prevHasOrder = rawPrev !== undefined && rawPrev !== null && rawPrev !== "" && !isNaN(prevOrder);
+      const currHasOrder = rawCurr !== undefined && rawCurr !== null && rawCurr !== "" && !isNaN(currOrder);
+
+      // Si al menos uno tiene sortOrder numérico válido (incluyendo 0.0 o decrementados),
+      // usamos la comparación matemática estricta sin coerción falsy.
+      if (prevHasOrder || currHasOrder) {
+        if (prevHasOrder && !currHasOrder) return prev;
+        if (currHasOrder && !prevHasOrder) return current;
         return currOrder > prevOrder ? current : prev;
       }
 
-      // Fallback heurístico: cuando sortOrder no está disponible,
+      // Fallback heurístico: cuando sortOrder no está disponible en ninguna de las políticas,
       // políticas con filtros más específicos (Grupos) pesan más que OU genéricas
       const prevQuery = (prev.policyQuery && prev.policyQuery.query) || "";
       const currQuery = (current.policyQuery && current.policyQuery.query) || "";
@@ -335,8 +382,14 @@ class PolicyReducerFactory {
    */
   static _mergeReducer(policies) {
     const sorted = policies.slice().sort((a, b) => {
-      const orderA = parseFloat((a.policyQuery && a.policyQuery.sortOrder) || 0);
-      const orderB = parseFloat((b.policyQuery && b.policyQuery.sortOrder) || 0);
+      const rawA = a.policyQuery && a.policyQuery.sortOrder;
+      const rawB = b.policyQuery && b.policyQuery.sortOrder;
+      const orderA = (rawA !== undefined && rawA !== null && rawA !== "" && !isNaN(parseFloat(rawA)))
+        ? parseFloat(rawA)
+        : -Infinity;
+      const orderB = (rawB !== undefined && rawB !== null && rawB !== "" && !isNaN(parseFloat(rawB)))
+        ? parseFloat(rawB)
+        : -Infinity;
       return orderA - orderB;
     });
     let mergedSetting = {};

@@ -70,13 +70,17 @@ class CensusStateWrapper {
             const assignments = response.items || [];
             
             assignments.forEach(assignment => {
-               const email = assignment.userId; 
-               const skuId = assignment.skuId; 
-               // Formateo exacto exigido por la Policy API (ej. /product/Google-Apps/sku/1010020027)
+               const email = (assignment.userId || "").trim().toLowerCase(); 
+               const skuId = (assignment.skuId || "").toString().trim(); 
+               // Formateo exacto canónico exigido por la Policy API (ej. /product/Google-Apps/sku/1010020027)
                const formattedSku = `/product/${productId}/sku/${skuId}`;
                
-               if (!map[email]) map[email] = [];
-               map[email].push(formattedSku);
+               if (email && skuId) {
+                 if (!map[email]) map[email] = [];
+                 if (!map[email].includes(formattedSku)) {
+                   map[email].push(formattedSku);
+                 }
+               }
             });
             pageToken = response.nextPageToken;
           } catch(e) {
