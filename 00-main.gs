@@ -130,7 +130,7 @@ function AuditoriaIdentidadIdentificacion() {
         new ManualUserAuditStrategy(),
         new DeprovisioningAuditStrategy(),
         new SlaOffboardingAuditStrategy(),
-        new SessionLengthPolicyStrategy(),
+        // new SessionLengthPolicyStrategy()
         new PostSsoLoginPolicyStrategy(customerId),
         new AdvancedProtectionPolicyStrategy(customerId)
       ];
